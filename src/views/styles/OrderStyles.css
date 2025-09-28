@@ -1,0 +1,328 @@
+/**
+ * 订单页面样式
+ */
+
+.order-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+}
+
+/* 加载状态样式 */
+.loading-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid rgb(255, 126, 147);
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+/* 错误状态样式 */
+.error-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.error-message {
+  color: #ff6b81;
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.btn-retry {
+  padding: 0.8rem 2rem;
+  background-color: rgb(255, 126, 147);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+}
+
+.btn-retry:hover {
+  background-color: #ff6b81;
+}
+
+.order-content {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.order-content h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 2rem;
+  font-size: 1.8rem;
+}
+
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.order-item {
+  background-color: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.order-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.order-id {
+  font-weight: 600;
+  color: #333;
+}
+
+.order-date {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.order-status {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-confirmed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-completed {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-cancelled {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.order-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pet-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pet-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pet-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.pet-type {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.reserve-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: right;
+}
+
+.date-info {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.date-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.date-value {
+  font-weight: 500;
+  color: #333;
+}
+
+.days-info {
+  color: #ff6b81;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.order-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn-cancel,
+.btn-contact,
+.btn-review {
+  padding: 0.6rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.btn-cancel {
+  background-color: #ff6b81;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background-color: #ff4757;
+}
+
+.btn-contact {
+  background-color: #74b9ff;
+  color: white;
+}
+
+.btn-contact:hover {
+  background-color: #0984e3;
+}
+
+.btn-review {
+  background-color: #55efc4;
+  color: #2d3436;
+}
+
+.btn-review:hover {
+  background-color: #00b894;
+}
+
+.no-orders {
+  text-align: center;
+  padding: 4rem 2rem;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.empty-image {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 1.5rem;
+  opacity: 0.5;
+}
+
+.no-orders p {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+}
+
+.btn-go-reserve {
+  padding: 0.8rem 2rem;
+  background-color: rgb(255, 126, 147);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+}
+
+.btn-go-reserve:hover {
+  background-color: #ff6b81;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .order-content {
+    padding: 1rem;
+  }
+  
+  .order-details {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .reserve-info {
+    text-align: left;
+    width: 100%;
+  }
+  
+  .date-info {
+    justify-content: flex-start;
+  }
+  
+  .order-actions {
+    justify-content: center;
+    width: 100%;
+  }
+}
