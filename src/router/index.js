@@ -6,6 +6,7 @@ import Profile from '../views/Profile.vue'
 import About from '../views/About.vue'
 import Reserve from '../views/Reserve.vue'
 import Order from '../views/Order.vue'
+import CustomerService from '../views/CustomerService.vue'
 import ReserveSuccess from '../views/ReserveSuccess.vue'
 const routes = [
     {
@@ -47,6 +48,11 @@ const routes = [
         path:'/reserve-success',
         name:'ReserveSuccess',
         component:ReserveSuccess
+    },
+    {
+        path:'/customer-service',
+        name:'CustomerService',
+        component:CustomerService
     }
 ]
 const router = createRouter({

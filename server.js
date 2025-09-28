@@ -5,9 +5,16 @@ import bodyParser from 'body-parser';
 import { initializeDatabase } from './server/db.js';
 import userRoutes from './server/routes/users.js';
 import orderRoutes from './server/routes/orders.js';
-
+import { WebSocketServer } from 'ws';
 // 创建Express应用
 const app = express();
+const wss = new WebSocketServer({ port: 3001 });
+wss.on('connection', (ws) => {
+  console.log('新的WebSocket连接');
+  ws.on('close',()=>{
+    console.log("客户端断开连接")
+  })
+});
 
 // 中间件
 app.use(cors());

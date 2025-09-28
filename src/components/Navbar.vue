@@ -1,5 +1,12 @@
 <template>
-  <div class="navbar">
+  <div 
+    class="navbar" 
+    :style="{
+      opacity: opacity,
+      transform: isVisible ? 'translateY(0)' : 'translateY(-100%)',
+      transition: 'opacity 0.3s ease, transform 0.3s ease'
+    }"
+  >
     <div class="navbar-left">
       <img src="../cat.svg" class="navbar-logo" alt="logo"></img>
       <span class="brand-name">宠物寄养</span>
@@ -45,8 +52,8 @@
               <div class="user-dropdown-item" @click="navigateToOrder">
                 <span>我的订单</span>
               </div>
-              <div class="user-dropdown-item" @click="navigateToFeedback">
-                <span>问题反馈</span>
+              <div class="user-dropdown-item" @click="navigateToCustomerService">
+                <span>联系客服</span>
               </div>
               <div class="user-dropdown-divider"></div>
               <div class="user-dropdown-item logout-item" @click="navigateToLogout">
@@ -61,7 +68,7 @@
 </template>
 <script>
 import { useRouter } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 export default {
   name: 'Navbar',
@@ -75,6 +82,10 @@ export default {
     const showUserDropdown = ref(false)
     // 下拉框显示的定时器
     let dropdownTimer = null
+    // 滚动相关变量
+    const lastScrollY = ref(0)
+    const isVisible = ref(true)
+    const opacity = ref(1)
 
     /**
      * 检查用户认证状态
@@ -100,7 +111,12 @@ export default {
     const navigateToHome = () => {
       router.push('/')
     }
-
+    /**
+     * 跳转到联系客服页面
+     */
+    const navigateToCustomerService = () => {
+      router.push('/customer-service')
+    }
     /**
      * 跳转到在线预约页面
      */
@@ -143,13 +159,6 @@ export default {
     }
 
     /**
-     * 跳转到问题反馈页面
-     */
-    const navigateToFeedback = () => {
-      router.push('/feedback')
-    }
-
-    /**
      * 退出登录
      * 清除用户信息并跳转到登录页面
      */
@@ -185,9 +194,39 @@ export default {
        showUserDropdown.value = true
      }
 
-    // 组件挂载时检查认证状态
+    /**
+     * 处理滚动事件
+     * 实现导航栏在向下滑动时逐渐消失，向上滑动时重新显示
+     */
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      
+      // 降低触发阈值，使效果更敏感
+      if (Math.abs(currentScrollY - lastScrollY.value) > 2) {
+        // 向下滚动超过20px时就开始隐藏导航栏，降低触发高度
+        if (currentScrollY > lastScrollY.value && currentScrollY > 20) {
+          isVisible.value = false
+          // 简化透明度计算，使过渡更直接
+          opacity.value = 0
+        } else {
+          // 向上滚动时，立即显示导航栏
+          isVisible.value = true
+          opacity.value = 1
+        }
+        
+        lastScrollY.value = currentScrollY
+      }
+    }
+
+    // 组件挂载时检查认证状态并添加滚动监听
     onMounted(() => {
       checkAuthStatus()
+      window.addEventListener('scroll', handleScroll)
+    })
+
+    // 组件卸载时移除滚动监听
+    onUnmounted(() => {
+      window.removeEventListener('scroll', handleScroll)
     })
 
     return {
@@ -200,11 +239,13 @@ export default {
       navigateToLogin,
       navigateToProfile,
       navigateToLogout,
-      navigateToFeedback,
       navigateToReserve,
+      navigateToCustomerService,
       handleUserIconMouseLeave,
       handleDropdownMouseEnter,
       navigateToOrder,
+      isVisible,
+      opacity
     }
   }
 }
