@@ -13,7 +13,7 @@ const API_BASE_URL = 'http://localhost:3000/api';
  */
 export const getUserInfo = () => {
   try {
-    const storedUser = localStorage.getItem('userInfo');
+    const storedUser = sessionStorage.getItem('userInfo');
     if (storedUser) {
       return JSON.parse(storedUser);
     }

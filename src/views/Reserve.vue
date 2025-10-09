@@ -19,11 +19,27 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>预约日期</label>
-                        <span>开始日期</span>
-                        <input type="date" id="reserve-start-date" v-model="formData.reserveStartDate" :min="today" required>
-                        <span>结束日期</span>
-                        <input type="date" id="reserve-end-date" v-model="formData.reserveEndDate" :min="minEndDate" required>
+                        <label>预约日期时间</label>
+                        <div class="date-time-group">
+                            <div>
+                                <span>开始日期</span>
+                                <input type="date" id="reserve-start-date" v-model="formData.reserveStartDate" :min="today" required>
+                            </div>
+                            <div>
+                                <span>开始时间</span>
+                                <input type="time" id="reserve-start-time" v-model="formData.reserveStartTime" :min="minStartTime" required>
+                            </div>
+                        </div>
+                        <div class="date-time-group">
+                            <div>
+                                <span>结束日期</span>
+                                <input type="date" id="reserve-end-date" v-model="formData.reserveEndDate" :min="minEndDate" required>
+                            </div>
+                            <div>
+                                <span>结束时间</span>
+                                <input type="time" id="reserve-end-time" v-model="formData.reserveEndTime" :min="minEndTime" required>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <button type="submit">提交预约</button>
@@ -50,10 +66,18 @@ export default {
         // 初始化路由
         const router = useRouter()
         
-        // 获取今天的日期，格式为YYYY-MM-DD
+        // 获取今天的日期和时间，格式为YYYY-MM-DD和HH:MM
         const today = computed(() => {
             const date = new Date();
             return date.toISOString().split('T')[0];
+        });
+        
+        // 获取当前时间，格式为HH:MM
+        const currentTime = computed(() => {
+            const date = new Date();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
         });
         
         // 表单数据
@@ -61,12 +85,38 @@ export default {
             petName: '',
             petType: '',
             reserveStartDate: '',
-            reserveEndDate: ''
+            reserveStartTime: '10:00', // 默认开始时间
+            reserveEndDate: '',
+            reserveEndTime: '18:00'   // 默认结束时间
         });
         
         // 计算属性：结束日期的最小可选值
         const minEndDate = computed(() => {
             return formData.reserveStartDate || today.value;
+        });
+        
+        // 计算属性：开始时间的最小可选值
+        const minStartTime = computed(() => {
+            // 如果选择的是今天，那么开始时间不能早于当前时间
+            if (formData.reserveStartDate === today.value) {
+                return currentTime.value;
+            }
+            // 否则没有限制
+            return '00:00';
+        });
+        
+        // 计算属性：结束时间的最小可选值
+        const minEndTime = computed(() => {
+            // 如果结束日期和开始日期相同
+            if (formData.reserveEndDate === formData.reserveStartDate) {
+                return formData.reserveStartTime;
+            }
+            // 如果结束日期是今天
+            else if (formData.reserveEndDate === today.value) {
+                return currentTime.value;
+            }
+            // 否则没有限制
+            return '00:00';
         });
         
         // 提交表单处理函数
@@ -82,9 +132,26 @@ export default {
                 return
             }
             
+            // 合并日期和时间
+            const startDateTime = `${formData.reserveStartDate}T${formData.reserveStartTime}:00`;
+            const endDateTime = `${formData.reserveEndDate}T${formData.reserveEndTime}:00`;
+            
+            // 验证结束时间不早于开始时间
+            if (new Date(endDateTime) < new Date(startDateTime)) {
+                alert('结束时间不能早于开始时间');
+                return;
+            }
+            
+            // 验证：预约开始时间不能早于当前时间
+            const currentDateTime = new Date();
+            if (new Date(startDateTime) < currentDateTime) {
+                alert('预约开始时间不能早于当前时间')
+                return
+            }
+            
             try {
-                // 从localStorage中获取用户信息
-                const storedUser = localStorage.getItem('userInfo');
+                // 从sessionStorage中获取用户信息
+                const storedUser = sessionStorage.getItem('userInfo');
                 
                 console.log('获取用户信息:', storedUser);
                 
@@ -106,6 +173,8 @@ export default {
                 
                 console.log('提交的表单数据:', formData);
                 
+                // 结束时间已经在前面验证过了，这里不需要重复验证
+                
                 // 向后端API发送预约数据
                 const response = await fetch('http://localhost:3000/api/orders', {
                     method: 'POST',
@@ -116,8 +185,8 @@ export default {
                         userId: userId,
                         petName: formData.petName,
                         petType: formData.petType,
-                        startDate: formData.reserveStartDate,
-                        endDate: formData.reserveEndDate
+                        startDate: startDateTime,
+                        endDate: endDateTime
                     })
                 });
                 
@@ -198,6 +267,20 @@ export default {
     display: flex;
     flex-direction: column;
     gap:5px;
+}
+
+            .date-time-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+            .date-time-group > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 .form-group label {

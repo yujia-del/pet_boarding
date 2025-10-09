@@ -8,13 +8,13 @@
     }"
   >
     <div class="navbar-left">
-      <img src="../cat.svg" class="navbar-logo" alt="logo"></img>
-      <span class="brand-name">宠物寄养</span>
+      <img src="../cat.svg" class="navbar-logo" alt="logo" @click="navigateToHome"></img>
+      <span class="brand-name" @click="navigateToHome">宠物寄养</span>
     </div>
     <div class="navbar-center">
       <div class="navbar-center-item" @click="navigateToHome">首页</div>
       <div class="navbar-center-item" @click="navigateToReserve">预约服务</div>
-      <div class="navbar-center-item" @click="navigateToServices">服务介绍</div>
+      <div class="navbar-center-item" @click="navigateToServices">领养平台</div>
       <div class="navbar-center-item" @click="navigateToAbout">关于我们</div>
     </div>
     <div class="navbar-right">
@@ -92,7 +92,7 @@ export default {
      * 从localStorage中读取用户信息并设置认证状态
      */
     const checkAuthStatus = () => {
-      const storedUser = localStorage.getItem('userInfo')
+      const storedUser = sessionStorage.getItem('userInfo')
       if (storedUser) {
         try {
           userInfo.value = JSON.parse(storedUser)
@@ -164,7 +164,7 @@ export default {
      */
     const navigateToLogout = () => {
       // 清除用户信息
-      localStorage.removeItem('userInfo')
+      sessionStorage.removeItem('userInfo')
       isAuthenticated.value = false
       userInfo.value = null
       showUserDropdown.value = false
@@ -279,9 +279,6 @@ export default {
   transition: transform 0.3s ease;
 }
 
-.navbar-logo:hover {
-  transform: scale(1.1);
-}
 
 .user-icon{
   height: 40px;

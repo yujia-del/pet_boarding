@@ -112,7 +112,10 @@ export default {
 /* 添加轮播容器样式 */
 .carousel-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   margin: 0 auto;
 }
 

@@ -22,7 +22,7 @@
                     <div class="order-header">
                         <div class="order-info">
                             <span class="order-id">订单编号: {{ order.id }}</span>
-                            <span class="order-date">创建时间: {{ formatDate(order.createTime) }}</span>
+                            <span class="order-date">创建时间: {{ formatDateWithTime(order.createTime) }}</span>
                         </div>
                         <div class="order-status" :class="getOrderStatusClass(order.status)">
                             {{ getOrderStatusText(order.status) }}
@@ -40,11 +40,11 @@
                         <div class="reserve-info">
                             <div class="date-info">
                                 <span class="date-label">开始日期:</span>
-                                <span class="date-value">{{ formatDate(order.reserveStartDate) }}</span>
+                                <span class="date-value">{{ formatDateWithTime(order.reserveStartDate) }}</span>
                             </div>
                             <div class="date-info">
                                 <span class="date-label">结束日期:</span>
-                                <span class="date-value">{{ formatDate(order.reserveEndDate) }}</span>
+                                <span class="date-value">{{ formatDateWithTime(order.reserveEndDate) }}</span>
                             </div>
                             <div class="days-info">
                                 共 {{ calculateDays(order.reserveStartDate, order.reserveEndDate) }} 天
@@ -57,11 +57,13 @@
                             @click="handleCancelOrder(order.id)">
                             取消订单
                         </button>
-                        <button v-if="order.status === 'pending'" class="btn-contact">
+                        <button v-if="order.status === 'pending'" class="btn-contact"
+                            @click="navigateToCustomerService">
                             联系客服
                         </button>
-                        <button v-if="order.status === 'completed'" class="btn-review">
-                            评价服务
+                        <button v-if="order.status === 'completed'" class="btn-contact"
+                            @click="navigateToCustomerService">
+                            联系客服
                         </button>
                     </div>
                 </div>
@@ -82,10 +84,10 @@
 import Navbar from '../components/Navbar.vue';
 import Footer from '../components/Footer.vue';
 import { useRouter } from 'vue-router';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { getCurrentUserId, handleApiError } from '../utils/api.js';
 import { getOrdersByUserId, cancelOrder } from '../utils/orderApi.js';
-import { formatDate, getOrderStatusText, getOrderStatusClass, formatPetType, calculateDays } from '../utils/formatters.js';
+import { formatDate, formatDateWithTime, getOrderStatusText, getOrderStatusClass, formatPetType, calculateDays } from '../utils/formatters.js';
 
 /**
  * 订单页面组件
@@ -111,7 +113,7 @@ export default {
             error.value = '';
 
             try {
-               
+
                 const currentUserId = getCurrentUserId();
 
                 if (!currentUserId) {
@@ -182,10 +184,70 @@ export default {
         const goToReserve = () => {
             router.push('/reserve');
         };
+        /**
+         * 跳转到联系客服页面
+         */
+        const navigateToCustomerService = () => {
+            router.push('/customer-service');
+        };
+        /**
+         * 检查订单时间并自动更新状态
+         * 当订单的结束时间已过且状态为待确认/已确认时，自动更新为已完成
+         */
+        const checkAndUpdateOrderStatus = () => {
+            const now = new Date();
+            
+            orders.value.forEach(order => {
+                // 检查订单是否应该自动完成
+                if ((order.status === 'pending' || order.status === 'confirmed') && 
+                    order.reserveEndDate) {
+                    const endDate = new Date(order.reserveEndDate);
+                    
+                    // 如果当前时间已超过订单结束时间，更新状态为已完成
+                    if (now > endDate) {
+                        order.status = 'completed';
+                        console.log(`订单 ${order.id} 已自动更新为已完成状态`);
+                    }
+                }
+            });
+        };
 
-        // 组件挂载时加载订单数据
+        // 定时器ID
+        let statusCheckTimer = null;
+
+        // 启动订单状态检查定时器
+        const startStatusCheckTimer = () => {
+            // 先立即检查一次
+            checkAndUpdateOrderStatus();
+            
+            // 设置定时器，每分钟检查一次
+            statusCheckTimer = setInterval(checkAndUpdateOrderStatus, 60000);
+        };
+
+        // 清除定时器
+        const clearStatusCheckTimer = () => {
+            if (statusCheckTimer) {
+                clearInterval(statusCheckTimer);
+                statusCheckTimer = null;
+            }
+        };
+
+        // 监听订单数据变化，重新启动定时器
+        watch(orders, (newOrders) => {
+            if (newOrders && newOrders.length > 0) {
+                clearStatusCheckTimer();
+                startStatusCheckTimer();
+            }
+        }, { deep: true });
+
+        // 组件挂载时加载订单数据并启动定时器
         onMounted(() => {
             loadOrders();
+        });
+
+        // 组件卸载时清除定时器
+        onUnmounted(() => {
+            clearStatusCheckTimer();
         });
 
         return {
@@ -193,12 +255,14 @@ export default {
             loading,
             error,
             formatDate,
+            formatDateWithTime,
             getOrderStatusText,
             getOrderStatusClass,
             formatPetType,
             calculateDays,
             handleCancelOrder,
-            goToReserve
+            goToReserve,
+            navigateToCustomerService,
         };
     }
 };

@@ -167,15 +167,23 @@ export default {
                     
                     if (userDetailResponse.ok) {
                         const userDetail = await userDetailResponse.json()
-                        // 保存完整的用户信息到localStorage
-                        localStorage.setItem('userInfo', JSON.stringify(userDetail))
+                        // 保存完整的用户信息到sessionStorage，仅在当前会话有效
+                        sessionStorage.setItem('userInfo', JSON.stringify(userDetail))
                     } else {
                         // 如果获取详情失败，使用登录返回的基本信息
-                        localStorage.setItem('userInfo', JSON.stringify(data.user))
+                        sessionStorage.setItem('userInfo', JSON.stringify(data.user))
                     }
                     
-                    // 跳转到首页
-                    router.push('/')
+                    // 检查是否有重定向路径
+                    const redirectPath = sessionStorage.getItem('redirectPath')
+                    if (redirectPath) {
+                        // 如果有重定向路径，跳转到该路径
+                        sessionStorage.removeItem('redirectPath')
+                        router.push(redirectPath)
+                    } else {
+                        // 否则跳转到首页
+                        router.push('/')
+                    }
                 } else {
                     // 显示后端返回的错误信息
                     loginError.value = data.message || '登录失败，请检查用户名和密码是否正确'

@@ -127,9 +127,9 @@ export default {
 /* 轮播图区域 */
 .carousel-section {
   /* 确保轮播图在内容区域中间 */
-  margin-left: 20px;
+  margin: 0 auto;
   /* 设置合适的宽度和高度 */
-  max-width: 900px;
+  max-width: 1400px;
   width: 100%;
   padding: 10px;
 }

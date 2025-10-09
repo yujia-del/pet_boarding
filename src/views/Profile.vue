@@ -125,8 +125,8 @@ export default {
      */
     const loadUserInfo = async () => {
       try {
-        // 从localStorage获取用户信息
-        const storedUser = localStorage.getItem('userInfo')
+        // 从sessionStorage获取用户信息
+        const storedUser = sessionStorage.getItem('userInfo')
         if (!storedUser) {
           // 如果没有用户信息，跳转到登录页面
           router.push('/login')
@@ -216,13 +216,13 @@ export default {
         
         if (response.ok) {
           updateSuccess.value = '个人信息更新成功！'
-          // 更新localStorage中的用户信息
-          const storedUser = localStorage.getItem('userInfo')
+          // 更新sessionStorage中的用户信息
+          const storedUser = sessionStorage.getItem('userInfo')
           if (storedUser) {
             const localUser = JSON.parse(storedUser)
             localUser.address = userData.address
             localUser.phone = userData.phone
-            localStorage.setItem('userInfo', JSON.stringify(localUser))
+            sessionStorage.setItem('userInfo', JSON.stringify(localUser))
           }
           
           // 3秒后清除成功提示
