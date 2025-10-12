@@ -46,11 +46,11 @@ export const cancelOrder = async (orderId) => {
 export const createOrder = async (orderData) => {
   const endpoint = '/orders';
   
-  // 确保日期格式正确
+  // 确保日期时间格式正确，保留小时信息
   const formattedData = {
     ...orderData,
-    startDate: formatDate(orderData.startDate),
-    endDate: formatDate(orderData.endDate)
+    startDate: orderData.startDate,
+    endDate: orderData.endDate
   };
   
   return apiRequest(endpoint, {

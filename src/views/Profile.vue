@@ -8,7 +8,7 @@
       <form class="profile-form" @submit.prevent="handleUpdate">
         <!-- 用户基本信息 -->
         <div class="profile-header">
-          <img class="profile-avatar" src="../user.svg" alt="用户头像">
+          <img class="profile-avatar" src="/user.svg" alt="用户头像">
           <div class="profile-info">
             <h3 class="profile-name">{{ userData.username }}</h3>
             <p class="profile-email">{{ userData.email }}</p>
@@ -103,7 +103,8 @@ export default {
       username: '',
       email: '',
       address: '',
-      phone: ''
+      phone: '',
+      avatar: '' 
     })
     
     // 表单错误信息
@@ -134,12 +135,13 @@ export default {
         }
         
         const localUser = JSON.parse(storedUser)
-        userData.id = localUser.id
+        const userId =localUser.user_id
+        userData.id = userId
         userData.username = localUser.username
         userData.email = localUser.email
         
         // 从服务器获取最新的用户信息
-        const response = await fetch(`http://localhost:3000/api/users/${localUser.id}`, {
+        const response = await fetch(`http://localhost:3000/api/users/${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -151,6 +153,8 @@ export default {
           // 更新用户数据，特别是地址和电话字段
           userData.address = data.address || ''
           userData.phone = data.phone || ''
+          // 更新头像信息
+          userData.avatar = data.avatar || 'default-avatar.svg'
         }
       } catch (error) {
         console.error('加载用户信息失败:', error)
@@ -217,13 +221,13 @@ export default {
         if (response.ok) {
           updateSuccess.value = '个人信息更新成功！'
           // 更新sessionStorage中的用户信息
-          const storedUser = sessionStorage.getItem('userInfo')
-          if (storedUser) {
-            const localUser = JSON.parse(storedUser)
-            localUser.address = userData.address
-            localUser.phone = userData.phone
-            sessionStorage.setItem('userInfo', JSON.stringify(localUser))
-          }
+            const storedUser = sessionStorage.getItem('userInfo')
+            if (storedUser) {
+              const localUser = JSON.parse(storedUser)
+              localUser.address = userData.address
+              localUser.phone = userData.phone
+              sessionStorage.setItem('userInfo', JSON.stringify(localUser))
+            }
           
           // 3秒后清除成功提示
           setTimeout(() => {
@@ -240,6 +244,8 @@ export default {
         isSubmitting.value = false
       }
     }
+    
+
     
     // 组件挂载时加载用户信息
     onMounted(() => {
@@ -297,10 +303,14 @@ export default {
 }
 
 .profile-avatar {
-  width: 80px;
-  height: 80px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   margin-right: 20px;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  object-fit: cover;
+  transition: all 0.3s ease;
 }
 
 .profile-info {
@@ -394,7 +404,9 @@ export default {
   font-weight: 500;
 }
 
-/* 响应式设计 */
+
+
+
 @media (max-width: 768px) {
   .profile-card {
     padding: 20px;
@@ -406,6 +418,8 @@ export default {
   }
   
   .profile-avatar {
+    width: 80px;
+    height: 80px;
     margin-right: 0;
     margin-bottom: 15px;
   }
@@ -413,5 +427,7 @@ export default {
   .profile-info {
     text-align: center;
   }
+  
+
 }
 </style>

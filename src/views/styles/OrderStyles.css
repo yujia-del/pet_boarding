@@ -300,7 +300,38 @@
   background-color: #ff6b81;
 }
 
-/* 响应式设计 */
+.reserve-table button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.reserve-table button:hover {
+    background-color: #45a049;
+}
+
+.reserve-table button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.time-slot-info {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #666;
+}
+
+.quota-count {
+    color: #4CAF50;
+    font-weight: bold;
+    font-size: 16px;
+}
+
 @media (max-width: 768px) {
   .order-content {
     padding: 1rem;

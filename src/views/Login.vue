@@ -158,7 +158,8 @@ export default {
                 
                 if (response.ok) {
                     // 登录成功后，获取完整的用户信息（包括地址和电话）
-                    const userDetailResponse = await fetch(`http://localhost:3000/api/users/${data.user.id}`, {
+                    const userId = data.user.user_id;
+                    const userDetailResponse = await fetch(`http://localhost:3000/api/users/${userId}`, {
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json'

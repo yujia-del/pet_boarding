@@ -6,43 +6,91 @@
                 <h2>宠物寄养预约</h2>
                 <form @submit.prevent="submitForm">
                     <div class="form-group">
-                        <label for="pet-name">宠物名称</label>
-                        <input type="text" id="pet-name" v-model="formData.petName" placeholder="请输入宠物名称" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="pet-type">宠物类型</label>
-                        <select id="pet-type" v-model="formData.petType" required>
-                            <option value="">请选择</option>
-                            <option value="dog">狗</option>
-                            <option value="cat">猫</option>
-                            <option value="other">其他</option>
+                        <label for="select-pet">选择宠物 <span style="color: red;">*</span></label>
+                        <select id="select-pet" v-model="selectedPet" @change="onDateChange" required>
+                            <option value="">请选择您的宠物</option>
+                            <option v-for="pet in userPets" :key="pet.pet_id" :value="pet">
+                                {{ pet.pet_name }} ({{ pet.type }})
+                            </option>
                         </select>
+                        <div v-if="userPets.length === 0" style="color: #999; font-size: 12px; margin-top: 5px;">
+                            您还没有添加宠物信息，请先添加宠物
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>预约日期时间</label>
                         <div class="date-time-group">
                             <div>
                                 <span>开始日期</span>
-                                <input type="date" id="reserve-start-date" v-model="formData.reserveStartDate" :min="today" required>
+                                <select v-model="formData.reserveStartDate" @change="onDateChange" required>
+                                    <option value="">请选择日期</option>
+                                    <option v-for="date in availableDates" :key="date.value" :value="date.value">
+                                        {{ date.label }}
+                                    </option>
+                                </select>
+                                <div v-if="formData.reserveStartDate && formData.reserveEndDate && formData.reserveEndDate < formData.reserveStartDate" class="error-message">
+                                    结束日期不能早于开始日期
+                                </div>
                             </div>
                             <div>
                                 <span>开始时间</span>
-                                <input type="time" id="reserve-start-time" v-model="formData.reserveStartTime" :min="minStartTime" required>
+                                <select v-model="formData.reserveStartTime" @change="onDateChange" required>
+                                    <option value="">请选择时间</option>
+                                    <option v-for="time in availableTimeSlots" :key="time" :value="time">
+                                        {{ formatTimeDisplay(time) }}
+                                    </option>
+                                    <option v-if="availableTimeSlots.length === 0" disabled>
+                                        当前日期无可预约时间
+                                    </option>
+                                </select>
                             </div>
                         </div>
                         <div class="date-time-group">
                             <div>
                                 <span>结束日期</span>
-                                <input type="date" id="reserve-end-date" v-model="formData.reserveEndDate" :min="minEndDate" required>
+                                <select v-model="formData.reserveEndDate" @change="onDateChange" required>
+                                    <option value="">请选择日期</option>
+                                    <option v-for="date in availableDates" :key="date.value" :value="date.value">
+                                        {{ date.label }}
+                                    </option>
+                                </select>
                             </div>
                             <div>
                                 <span>结束时间</span>
-                                <input type="time" id="reserve-end-time" v-model="formData.reserveEndTime" :min="minEndTime" required>
+                                <select v-model="formData.reserveEndTime" @change="onDateChange" required>
+                                    <option value="">请选择时间</option>
+                                    <option v-for="time in availableEndTimeSlots" :key="time" :value="time">
+                                        {{ formatTimeDisplay(time) }}
+                                    </option>
+                                    <option v-if="availableEndTimeSlots.length === 0" disabled>
+                                        当前日期无可预约时间
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        <div v-if="timeSlotInfo" class="time-slot-info">
+                            剩余名额: <span class="quota-count">{{ timeSlotInfo.available }}</span>/{{ timeSlotInfo.total }}
+                            <span v-if="timeSlotInfo.available <= 0" class="no-quota-warning">（已满）</span>
+                        </div>
+                        
+                        <!-- 显示各时间段预约人数统计 -->
+                        <div v-if="timeSlotInfo && timeSlotInfo.bookedByTimeSlot" class="time-slot-stats">
+                            <div class="stats-title">各时间段预约情况:</div>
+                            <div class="time-slot-list">
+                                <div v-for="slot in timeSlotsList" :key="slot.time" class="time-slot-item">
+                                    <span class="slot-time">{{ formatTimeDisplay(slot.time) }}</span>
+                                    <span class="slot-status" :class="{ 'slot-full': slot.booked >= timeSlotInfo.total }">{{ slot.booked }}/{{ timeSlotInfo.total }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="form-group">
-                        <button type="submit">提交预约</button>
+                        <label for="special-requests">特殊要求（选填）</label>
+                        <textarea id="special-requests" v-model="formData.specialRequests" placeholder="如有特殊照顾需求，请在此说明" rows="3" maxlength="500"></textarea>
+                        <div class="char-count">{{ formData.specialRequests.length }}/500 字符</div>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" :disabled="!canSubmit">提交预约</button>
                     </div>
                 </form>
             </div>
@@ -54,7 +102,7 @@
 import Navbar from '../components/Navbar.vue';
 import Footer from '../components/Footer.vue';
 import {useRouter} from 'vue-router'
-import {reactive, computed} from 'vue'
+import {reactive, computed, ref, watch, onMounted} from 'vue'
 
 export default {
     name: 'Reserve',
@@ -66,10 +114,306 @@ export default {
         // 初始化路由
         const router = useRouter()
         
-        // 获取今天的日期和时间，格式为YYYY-MM-DD和HH:MM
+        // 获取今天的日期，格式为YYYY-MM-DD
         const today = computed(() => {
             const date = new Date();
             return date.toISOString().split('T')[0];
+        });
+        
+        /**
+         * 格式化日期为YYYY-MM-DD格式
+         * @param {Date} date - 日期对象
+         * @returns {string} - 格式化后的日期字符串
+         */
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        };
+        
+        // 表单数据
+        const formData = reactive({
+            reserveStartDate: '',
+            reserveStartTime: '',
+            reserveEndDate: '',
+            reserveEndTime: '',
+            specialRequests: '' // 特殊要求，对应数据库中的special_requests字段
+        });
+        
+        // 选中的宠物信息
+        const selectedPet = ref(null);
+        
+        // 用户的宠物列表
+        const userPets = ref([]);
+        
+        // 加载用户宠物信息
+        const loadUserPets = async () => {
+            try {
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                if (!userInfo) {
+                    alert('请先登录');
+                    router.push('/login');
+                    return;
+                }
+                
+                const response = await fetch('http://localhost:3000/api/pets?userId=' + userInfo.user_id);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    userPets.value = result || [];
+                } else {
+                    alert(result.message || '获取宠物信息失败');
+                }
+            } catch (error) {
+                console.error('获取宠物信息失败:', error);
+                alert('获取宠物信息失败');
+            }
+        };
+        
+        // 时间段信息
+        const timeSlotInfo = ref(null);
+        
+        // 监听开始日期变化
+        watch(
+            () => formData.reserveStartDate,
+            (newStartDate, oldStartDate) => {
+                // 清除之前选择的时间
+                formData.reserveStartTime = '';
+                formData.reserveEndTime = '';
+                
+                // 确保结束日期不早于开始日期
+                if (newStartDate && formData.reserveEndDate && formData.reserveEndDate < newStartDate) {
+                    formData.reserveEndDate = newStartDate;
+                    // 当结束日期被自动调整时，触发结束日期变化的逻辑
+                    onDateChange();
+                }
+                
+                // 当日期改变时，检查是否有可用时间段
+                if (newStartDate && availableTimeSlots.value.length === 0) {
+                    // 如果当前日期没有可用时间段，可以选择下一个可用日期
+                    const nextAvailableDate = availableDates.value.find(date => date.value > newStartDate);
+                    if (nextAvailableDate) {
+                        formData.reserveStartDate = nextAvailableDate.value;
+                    }
+                }
+            }
+        );
+        
+        // 监听结束日期变化
+        watch(
+            () => formData.reserveEndDate,
+            (newEndDate, oldEndDate) => {
+                // 清除之前选择的结束时间
+                formData.reserveEndTime = '';
+                
+                // 如果开始日期和结束日期相同，则检查开始时间是否需要调整
+                if (newEndDate === formData.reserveStartDate && formData.reserveStartTime) {
+                    // 如果开始时间已选择，但在当前日期下不再有效，则清除开始时间
+                    if (!availableTimeSlots.value.includes(formData.reserveStartTime)) {
+                        formData.reserveStartTime = '';
+                    }
+                }
+                
+                // 触发日期变化事件处理
+                if (newEndDate !== oldEndDate) {
+                    onDateChange();
+                }
+            }
+        );
+        
+        // 监听开始时间变化，确保结束时间的有效性并检查时间段名额
+        watch(
+            () => formData.reserveStartTime,
+            async (newTime, oldTime) => {
+                // 如果开始时间已选择，且结束日期与开始日期相同，且结束时间早于或等于开始时间，则清除结束时间
+                if (formData.reserveStartDate === formData.reserveEndDate && 
+                    newTime && 
+                    formData.reserveEndTime && 
+                    formData.reserveEndTime <= newTime) {
+                    formData.reserveEndTime = '';
+                }
+                
+                // 如果开始时间发生变化且有选择日期，检查该时间段的名额
+                if (newTime && formData.reserveStartDate) {
+                    await checkTimeSlotQuota(newTime);
+                }
+            }
+        );
+        
+        /**
+         * 预加载未来几天的日期可用性信息
+         */
+        async function preloadDateAvailability() {
+            // 获取当前计算的可用日期列表
+            const dates = [];
+            const todayDate = new Date();
+            
+            // 计算未来10天的日期
+            for (let i = 0; i < 10; i++) {
+                const date = new Date(todayDate);
+                date.setDate(todayDate.getDate() + i);
+                const dateStr = date.toISOString().split('T')[0];
+                
+                // 只预加载有效的日期
+                if (isValidReservationDate(dateStr)) {
+                    dates.push(dateStr);
+                }
+            }
+            
+            // 并发请求预加载日期可用性
+            const promises = dates.map(async (date) => {
+                try {
+                    // 确保日期格式正确
+                    const formattedDate = date.replace(/[^0-9-]/g, '');
+                    
+                    // 构建API URL
+                    const apiUrl = `http://localhost:3000/api/orders/check-availability/${formattedDate}`;
+                    
+                    // 调用后端API检查日期的可用名额
+                    const response = await fetch(apiUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // 更新日期可用性缓存
+                        dateAvailabilityCache.value[date] = data.hasAvailability;
+                    }
+                } catch (error) {
+                    console.warn(`预加载日期 ${date} 可用性失败:`, error);
+                    // 出错时默认认为日期可用
+                    dateAvailabilityCache.value[date] = true;
+                }
+            });
+            
+            // 等待所有预加载请求完成
+            await Promise.allSettled(promises);
+        }
+        
+        // 组件挂载时，如果没有默认选中的日期且有可用日期，则选择第一个可用日期
+        onMounted(async () => {
+            // 预加载未来几天的日期可用性信息
+            await preloadDateAvailability();
+            
+            if (!formData.reserveStartDate && availableDates.value.length > 0) {
+                formData.reserveStartDate = availableDates.value[0].value;
+                formData.reserveEndDate = availableDates.value[0].value;
+            }
+            // 加载用户宠物信息
+            loadUserPets();
+        });
+        const canSubmit = computed(() => {
+            // 检查所有必填字段
+            if (!selectedPet.value || !formData.reserveStartDate || 
+                !formData.reserveStartTime || !formData.reserveEndDate || !formData.reserveEndTime) {
+                return false;
+            }
+            
+            // 检查日期是否有效
+            const startDate = new Date(formData.reserveStartDate);
+            const endDate = new Date(formData.reserveEndDate);
+            if (endDate < startDate) {
+                return false;
+            }
+            
+            // 检查时间是否有效
+            if (formData.reserveStartDate === formData.reserveEndDate) {
+                const startTime = formData.reserveStartTime;
+                const endTime = formData.reserveEndTime;
+                if (endTime <= startTime) {
+                    return false;
+                }
+            }
+            
+            // 检查时间段是否还有名额
+            if (timeSlotInfo.value && timeSlotInfo.value.available <= 0) {
+                return false;
+            }
+            
+            return true;
+        });
+        
+        /**
+         * 检查特定日期是否有可用的预约时间点
+         * @param {string} date - 日期字符串，格式为YYYY-MM-DD
+         * @returns {boolean} - 表示该日期是否有可用时间点
+         */
+        function hasAvailableTimeSlots(date) {
+            // 检查日期是否有效
+            if (!isValidReservationDate(date)) {
+                return false;
+            }
+            
+            // 检查缓存中的日期可用性
+            if (dateAvailabilityCache.value[date] === false) {
+                return false;
+            }
+            
+            return true;
+        }
+        
+        /**
+         * 验证日期是否可以进行预约
+         * @param {string} date - 日期字符串，格式为YYYY-MM-DD
+         * @returns {boolean} - 表示日期是否有效可预约
+         */
+        function isValidReservationDate(date) {
+            // 解析日期
+            const targetDate = new Date(date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // 排除过去的日期
+            if (targetDate < today) {
+                return false;
+            }
+            
+            // 如果是今天，要考虑当前时间是否已经过了预约时间
+            if (date === formatDate(new Date())) {
+                const now = new Date();
+                const currentHour = now.getHours();
+                // 如果当前时间已经过了17:00，则今天不再接受预约
+                if (currentHour >= 17) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // 缓存日期可用性结果，避免重复计算
+        const dateAvailabilityCache = ref({});
+
+        // 可用的日期列表（从今天开始的10天，基于日期有效性和名额可用性）
+        const availableDates = computed(() => {
+            const dates = [];
+            const todayDate = new Date();
+            
+            for (let i = 0; i < 10; i++) {
+                const date = new Date(todayDate);
+                date.setDate(todayDate.getDate() + i);
+                
+                const dateStr = date.toISOString().split('T')[0];
+                const dateLabel = formatDateLabel(date);
+                
+                // 验证日期是否有效可预约
+                if (isValidReservationDate(dateStr)) {
+                    // 检查日期是否有可用名额（如果缓存中有记录）
+                    // 如果缓存中没有记录，默认认为日期可用（避免因预加载不及时导致日期不显示）
+                    const isDateAvailable = dateAvailabilityCache.value[dateStr] !== false;
+                    
+                    if (isDateAvailable) {
+                        // 添加日期到列表中
+                        dates.push({
+                            value: dateStr,
+                            label: dateLabel
+                        });
+                    }
+                }
+            }
+            
+            return dates;
         });
         
         // 获取当前时间，格式为HH:MM
@@ -80,67 +424,244 @@ export default {
             return `${hours}:${minutes}`;
         });
         
-        // 表单数据
-        const formData = reactive({
-            petName: '',
-            petType: '',
-            reserveStartDate: '',
-            reserveStartTime: '10:00', // 默认开始时间
-            reserveEndDate: '',
-            reserveEndTime: '18:00'   // 默认结束时间
-        });
-        
-        // 计算属性：结束日期的最小可选值
-        const minEndDate = computed(() => {
-            return formData.reserveStartDate || today.value;
-        });
-        
-        // 计算属性：开始时间的最小可选值
-        const minStartTime = computed(() => {
-            // 如果选择的是今天，那么开始时间不能早于当前时间
+        /**
+         * 计算开始时间可用的时间段（9:00-17:00，每小时一个时间段）
+         */
+        const availableTimeSlots = computed(() => {
+            // 如果没有选择日期，返回空数组
+            if (!formData.reserveStartDate) {
+                return [];
+            }
+            
+            const allTimeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+            
+            // 如果选择的是今天，则过滤掉已过去的时间
             if (formData.reserveStartDate === today.value) {
-                return currentTime.value;
+                const now = new Date();
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
+                
+                return allTimeSlots.filter(time => {
+                    const [hour, minute] = time.split(':').map(Number);
+                    // 如果当前小时小于时间点的小时，或者小时相同但分钟小于30，则该时间点可用
+                    return hour > currentHour || (hour === currentHour && currentMinute < 30);
+                });
             }
-            // 否则没有限制
-            return '00:00';
+            
+            // 如果选择的是未来的日期，显示所有时间段
+            return allTimeSlots;
         });
         
-        // 计算属性：结束时间的最小可选值
-        const minEndTime = computed(() => {
-            // 如果结束日期和开始日期相同
-            if (formData.reserveEndDate === formData.reserveStartDate) {
-                return formData.reserveStartTime;
+        /**
+         * 计算结束时间可用的时间段（9:00-17:00，每小时一个时间段）
+         * 基于结束日期和开始时间过滤可用时间
+         */
+        const availableEndTimeSlots = computed(() => {
+            // 如果没有选择日期，返回空数组
+            if (!formData.reserveEndDate) {
+                return [];
             }
-            // 如果结束日期是今天
-            else if (formData.reserveEndDate === today.value) {
-                return currentTime.value;
+            
+            const allTimeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+            
+            // 如果选择的是今天，则过滤掉已过去的时间
+            if (formData.reserveEndDate === today.value) {
+                const now = new Date();
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
+                
+                return allTimeSlots.filter(time => {
+                    const [hour, minute] = time.split(':').map(Number);
+                    // 如果当前小时小于时间点的小时，或者小时相同但分钟小于30，则该时间点可用
+                    return hour > currentHour || (hour === currentHour && currentMinute < 30);
+                });
             }
-            // 否则没有限制
-            return '00:00';
+            
+            // 如果开始日期和结束日期相同，则结束时间必须晚于开始时间
+            if (formData.reserveStartDate === formData.reserveEndDate && formData.reserveStartTime) {
+                return allTimeSlots.filter(time => time > formData.reserveStartTime);
+            }
+            
+            // 如果选择的是未来的日期，显示所有时间段
+            return allTimeSlots;
         });
+        
+        /**
+         * 格式化日期显示标签
+         */
+        function formatDateLabel(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const weekDay = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+            
+            return `${year}-${month}-${day} (周${weekDay})`;
+        }
+        
+        /**
+         * 格式化时间显示
+         */
+        function formatTimeDisplay(time) {
+            const [hours, minutes] = time.split(':');
+            const hourNum = parseInt(hours);
+            
+            if (hourNum >= 12) {
+                return hourNum === 12 ? `${hours}:${minutes} 中午` : `${hourNum - 12}:${minutes} 下午`;
+            } else {
+                return `${hours}:${minutes} 上午`;
+            }
+        }
+        
+        /**
+         * 生成时间段列表，包含每个时间段的预约人数信息
+         * @returns {Array} 包含时间段和预约人数的对象数组
+         */
+        const timeSlotsList = computed(() => {
+            // 如果没有时间段预约信息，返回空数组
+            if (!timeSlotInfo.value || !timeSlotInfo.value.bookedByTimeSlot) {
+                return [];
+            }
+            
+            // 获取所有可能的时间段（与availableTimeSlots保持一致）
+            const allTimeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+            
+            // 构建时间段列表，包含每个时间段的预约人数
+            return allTimeSlots.map(time => ({
+                time: time,
+                booked: timeSlotInfo.value.bookedByTimeSlot[time] || 0
+            }));
+        });
+        
+        /**
+         * 日期改变时的处理函数
+         */
+        async function onDateChange() {
+            // 如果选择了日期和时间，检查时间段名额
+            if (formData.reserveStartDate && formData.reserveStartTime) {
+                await checkTimeSlotQuota();
+            }
+        }
+        
+        /**
+         * 检查时间段名额
+         * @param {string} [timeSlot] - 可选，指定要检查的具体时间段，格式为HH:MM
+         */
+        async function checkTimeSlotQuota(timeSlot = null) {
+            try {
+                if (!formData.reserveStartDate) {
+                    timeSlotInfo.value = null;
+                    return;
+                }
+                
+                // 使用传入的timeSlot或表单中选择的timeSlot
+                const selectedTimeSlot = timeSlot || formData.reserveStartTime;
+                console.log(`检查时间段名额: ${formData.reserveStartDate} ${selectedTimeSlot || '全天'}`);
+                
+                // 确保日期格式正确
+                const formattedDate = formData.reserveStartDate.replace(/[^0-9-]/g, '');
+                console.log(`格式化后的日期: ${formattedDate}`);
+                
+                // 构建API URL，根据是否有指定时间段添加查询参数
+                let apiUrl = `http://localhost:3000/api/orders/check-availability/${formattedDate}`;
+                if (selectedTimeSlot) {
+                    apiUrl += `?timeSlot=${encodeURIComponent(selectedTimeSlot)}`;
+                }
+                console.log(`请求API URL: ${apiUrl}`);
+                
+                // 调用后端API检查日期或时间段的可用名额
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log(`API响应状态码: ${response.status}`);
+                
+                // 检查响应是否为JSON格式
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const errorText = await response.text();
+                    console.error('API返回非JSON响应:', errorText);
+                    throw new Error('服务器返回了无效的响应格式');
+                }
+                
+                if (!response.ok) {
+                    try {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || '检查名额失败');
+                    } catch (jsonError) {
+                        throw new Error(`检查名额失败，HTTP状态码: ${response.status}`);
+                    }
+                }
+                
+                const data = await response.json();
+                console.log('时间段名额信息:', data);
+                
+                // 更新日期可用性缓存
+                dateAvailabilityCache.value[formData.reserveStartDate] = data.hasAvailability;
+                
+                // 设置时间段信息，包含按时间段统计的预约情况
+                timeSlotInfo.value = {
+                    date: formData.reserveStartDate,
+                    time: selectedTimeSlot || '全天',
+                    total: data.maxPets,
+                    booked: data.booked,
+                    available: data.available,
+                    timeSlot: data.timeSlot,  // 存储当前查询的具体时间段
+                    bookedByTimeSlot: data.bookedByTimeSlot  // 存储各时间段的预约人数统计
+                };
+            } catch (error) {
+                console.error('检查时间段名额失败:', error);
+                timeSlotInfo.value = null;
+                // 在错误情况下，可以显示一个默认的名额信息
+                // 但最好提醒用户系统无法获取准确的名额信息
+            }
+        }
         
         // 提交表单处理函数
         const submitForm = async () => {
-            if (!formData.petName || !formData.petType || !formData.reserveStartDate || !formData.reserveEndDate) {
-                alert('请填写完整预约信息')
+            // 优先检查是否是因为名额问题导致无法提交
+            if (timeSlotInfo.value && timeSlotInfo.value.available <= 0) {
+                alert('当前时段不可预约')
                 return
             }
             
-            // 日期验证：结束日期不能早于开始日期
-            if (new Date(formData.reserveEndDate) < new Date(formData.reserveStartDate)) {
-                alert('结束日期不能早于开始日期')
+            if (!canSubmit.value) {
+                // 提供更具体的错误信息
+                if (!selectedPet.value) {
+                    alert('请选择您的宠物');
+                    return;
+                }
+                if (!formData.reserveStartDate || !formData.reserveEndDate) {
+                    alert('请选择完整的预约日期');
+                    return;
+                }
+                if (formData.reserveEndDate < formData.reserveStartDate) {
+                    alert('结束日期不能早于开始日期');
+                    return;
+                }
+                if (!formData.reserveStartTime || !formData.reserveEndTime) {
+                    alert('请选择完整的预约时间');
+                    return;
+                }
+                if (formData.reserveStartDate === formData.reserveEndDate && formData.reserveEndTime <= formData.reserveStartTime) {
+                    alert('结束时间不能早于或等于开始时间');
+                    return;
+                }
+                alert('请检查预约信息是否完整');
+                return
+            }
+            
+            // 检查是否已选择宠物
+            if (!selectedPet.value || !selectedPet.value.pet_id) {
+                alert('请选择宠物')
                 return
             }
             
             // 合并日期和时间
             const startDateTime = `${formData.reserveStartDate}T${formData.reserveStartTime}:00`;
             const endDateTime = `${formData.reserveEndDate}T${formData.reserveEndTime}:00`;
-            
-            // 验证结束时间不早于开始时间
-            if (new Date(endDateTime) < new Date(startDateTime)) {
-                alert('结束时间不能早于开始时间');
-                return;
-            }
             
             // 验证：预约开始时间不能早于当前时间
             const currentDateTime = new Date();
@@ -149,23 +670,92 @@ export default {
                 return
             }
             
+            // 提交前再次检查可用名额，防止并发预约导致的名额问题
+            try {
+                // 确保日期格式正确
+                const formattedDate = formData.reserveStartDate.replace(/[^0-9-]/g, '');
+                console.log(`格式化后的日期: ${formattedDate}`);
+                
+                // 构建API URL
+                const apiUrl = `http://localhost:3000/api/orders/check-availability/${formattedDate}`;
+                console.log(`请求API URL: ${apiUrl}`);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log(`API响应状态码: ${response.status}`);
+                
+                // 检查响应是否为JSON格式
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const errorText = await response.text();
+                    console.error('API返回非JSON响应:', errorText);
+                    alert('服务器返回了无效的响应格式，请稍后再试');
+                    return;
+                }
+                
+                if (!response.ok) {
+                    try {
+                        const errorData = await response.json();
+                        alert(errorData.message || '检查名额失败，请稍后再试');
+                    } catch (jsonError) {
+                        alert(`检查名额失败，HTTP状态码: ${response.status}`);
+                    }
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.available <= 0) {
+                    alert(`很抱歉，${formData.reserveStartDate} 的名额已经被预约满，请选择其他日期`);
+                    return;
+                }
+            } catch (error) {
+                console.error('提交前检查名额失败:', error);
+                alert('系统忙，请稍后再试');
+                return;
+            }
+            
             try {
                 // 从sessionStorage中获取用户信息
                 const storedUser = sessionStorage.getItem('userInfo');
                 
                 console.log('获取用户信息:', storedUser);
                 
-                // 解析用户信息并获取用户ID
-                const userInfo = JSON.parse(storedUser);
-                console.log('完整的用户信息:', userInfo);
+                // 检查用户信息是否存在
+                if (!storedUser) {
+                    console.error('用户信息不存在');
+                    alert('用户未登录，请先登录');
+                    router.push('/login');
+                    return;
+                }
                 
-                // 确保userId是数字类型
-                const userId = parseInt(userInfo.id);
-                console.log('解析后的用户ID:', userId, '类型:', typeof userId);
+                // 解析用户信息并获取用户ID
+                let userInfo;
+                try {
+                    userInfo = JSON.parse(storedUser);
+                    console.log('完整的用户信息:', userInfo);
+                } catch (parseError) {
+                    console.error('解析用户信息失败:', parseError);
+                    alert('用户信息格式错误，请重新登录');
+                    router.push('/login');
+                    return;
+                }
+                
+                // 安全地获取用户ID
+                let userId;
+                if (userInfo && userInfo.user_id) {
+                    userId = parseInt(userInfo.user_id);
+                    console.log('解析后的用户ID:', userId, '类型:', typeof userId);
+                }
                 
                 // 验证用户ID是否为有效数字
                 if (isNaN(userId) || userId <= 0) {
-                    console.error('无效的用户ID:', userInfo.id);
+                    console.error('无效的用户ID:', userInfo?.user_id || '未定义');
                     alert('用户信息异常，请重新登录');
                     router.push('/login');
                     return;
@@ -173,7 +763,19 @@ export default {
                 
                 console.log('提交的表单数据:', formData);
                 
-                // 结束时间已经在前面验证过了，这里不需要重复验证
+                // 构建API请求数据，包含选中宠物的ID
+                const requestData = {
+                    userId: userId,
+                    petId: selectedPet.value.pet_id,  // 添加宠物ID
+                    petName: selectedPet.value.pet_name,
+                    petType: selectedPet.value.type,
+                    startDate: startDateTime,
+                    endDate: endDateTime,
+                    specialRequests: formData.specialRequests || ''
+                };
+                
+                console.log('发送给API的数据:', requestData);
+                console.log('JSON字符串:', JSON.stringify(requestData));
                 
                 // 向后端API发送预约数据
                 const response = await fetch('http://localhost:3000/api/orders', {
@@ -181,23 +783,22 @@ export default {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        userId: userId,
-                        petName: formData.petName,
-                        petType: formData.petType,
-                        startDate: startDateTime,
-                        endDate: endDateTime
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
                 console.log('API响应状态:', response.status);
+                
+                // 检查响应头，了解更多错误信息
+                console.log('API响应头:', Object.fromEntries(response.headers.entries()));
                 
                 if (!response.ok) {
                     // 尝试获取详细的错误信息
                     try {
                         const errorData = await response.json();
+                        console.error('API错误数据:', errorData);
                         throw new Error(errorData.message || '预约失败，请稍后再试');
                     } catch (jsonError) {
+                        console.error('解析错误响应失败:', jsonError);
                         throw new Error(`预约失败，HTTP状态码: ${response.status}`);
                     }
                 }
@@ -205,11 +806,23 @@ export default {
                 const data = await response.json();
                 console.log('API响应数据:', data);
                 
+                // 预约成功后，更新时间段名额状态，表示该时间段已被预约完
+                if (timeSlotInfo.value) {
+                    timeSlotInfo.value.available = 0;
+                    timeSlotInfo.value.booked = 1; // 1个名额已被预约
+                }
+                
                 // 提交成功后，跳转到成功页面，并传递预约详情和订单ID
                 router.push({
                     name: 'ReserveSuccess', 
                     query: {
-                        ...formData,
+                        petName: selectedPet.value.pet_name,
+                        petType: selectedPet.value.type,
+                        reserveStartDate: formData.reserveStartDate,
+                        reserveStartTime: formData.reserveStartTime,
+                        reserveEndDate: formData.reserveEndDate,
+                        reserveEndTime: formData.reserveEndTime,
+                        specialRequests: formData.specialRequests,
                         orderId: data.orderId
                     }
                 });
@@ -221,12 +834,22 @@ export default {
         
         return {
             formData,
+            selectedPet,
+            userPets,
             submitForm,
             today,
-            minEndDate
+            availableDates,
+                availableTimeSlots,
+                availableEndTimeSlots,
+                timeSlotInfo,
+                canSubmit,
+            formatTimeDisplay,
+            onDateChange,
+            hasAvailableTimeSlots,
+            dateAvailabilityCache,
+            loadUserPets
         }
     }
-
 }
 </script>
 <style scoped>
@@ -280,9 +903,66 @@ export default {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 5px;
 }
 
+            .error-message {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.no-quota-warning {
+    color: #dc3545;
+    font-size: 12px;
+    margin-left: 5px;
+}
+
+/* 时间段统计样式 */
+.time-slot-stats {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.stats-title {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.time-slot-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.time-slot-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px;
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    font-size: 12px;
+}
+
+.slot-time {
+    color: #495057;
+    margin-bottom: 4px;
+}
+
+.slot-status {
+    font-weight: 500;
+    color: #28a745;
+}
+
+.slot-full {
+    color: #dc3545;
+}
 .form-group label {
     display: block;
     margin-bottom: 0.5rem;
@@ -321,5 +1001,20 @@ export default {
 
 .form-group button:hover {
     background-color: pink;
+}
+
+/* 字符计数器样式 */
+.char-count {
+    font-size: 12px;
+    color: #666;
+    text-align: right;
+    margin-top: 4px;
+}
+
+/* 特殊要求输入框样式 */
+#special-requests {
+    resize: vertical; /* 仅允许垂直调整大小 */
+    min-height: 80px; /* 最小高度限制 */
+    max-height: 200px; /* 最大高度限制 */
 }
 </style>

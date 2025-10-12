@@ -14,7 +14,6 @@
     <div class="navbar-center">
       <div class="navbar-center-item" @click="navigateToHome">首页</div>
       <div class="navbar-center-item" @click="navigateToReserve">预约服务</div>
-      <div class="navbar-center-item" @click="navigateToServices">领养平台</div>
       <div class="navbar-center-item" @click="navigateToAbout">关于我们</div>
     </div>
     <div class="navbar-right">
@@ -29,7 +28,7 @@
             @click="navigateToProfile"
             @mouseenter="showUserDropdown = true"
             @mouseleave="handleUserIconMouseLeave"
-            src="../user.svg" 
+            src="/user.svg" 
             alt="用户图标">
           
           <!-- 用户信息下拉框 -->
@@ -39,7 +38,7 @@
              @mouseenter="handleDropdownMouseEnter"
              @mouseleave="showUserDropdown = false">
             <div class="user-dropdown-header">
-              <img class="dropdown-user-icon" src="../user.svg" alt="用户头像">
+              <img class="dropdown-user-icon" src="/user.svg" alt="用户头像">
               <div class="user-details">
                 <div class="user-dropdown-name">{{ userInfo.username }}</div>
                 <div class="user-dropdown-email">{{ userInfo.email }}</div>
@@ -51,6 +50,9 @@
               </div>
               <div class="user-dropdown-item" @click="navigateToOrder">
                 <span>我的订单</span>
+              </div>
+              <div class="user-dropdown-item" @click="navigateToPet">
+                <span>我的宠物</span>
               </div>
               <div class="user-dropdown-item" @click="navigateToCustomerService">
                 <span>联系客服</span>
@@ -171,6 +173,12 @@ export default {
       // 跳转到登录页面
       router.push('/')
     }
+    /**
+     * 跳转到我的宠物页面
+     */
+    const navigateToPet = () => {
+      router.push('/pets')
+    }
 
     /**
       * 处理用户图标鼠标离开事件
@@ -244,6 +252,7 @@ export default {
       handleUserIconMouseLeave,
       handleDropdownMouseEnter,
       navigateToOrder,
+      navigateToPet,
       isVisible,
       opacity
     }

@@ -49,19 +49,28 @@
                             <div class="days-info">
                                 共 {{ calculateDays(order.reserveStartDate, order.reserveEndDate) }} 天
                             </div>
+                            <div class="price-info">
+                                <span class="price-label">总金额:</span>
+                                <span class="price-value">¥{{ typeof order.totalPrice === 'number' ? order.totalPrice.toFixed(2) : '0.00' }}</span>
+                            </div>
+                        </div>
+                        <!-- 特殊要求信息 -->
+                        <div class="special-requests" v-if="order.specialRequests && order.specialRequests.trim()">
+                            <div class="request-label">特殊要求:</div>
+                            <div class="request-content">{{ order.specialRequests }}</div>
                         </div>
                     </div>
 
                     <div class="order-actions">
-                        <button v-if="order.status === 'pending'" class="btn-cancel"
+                        <button v-if="order.status === '待确认'" class="btn-cancel"
                             @click="handleCancelOrder(order.id)">
                             取消订单
                         </button>
-                        <button v-if="order.status === 'pending'" class="btn-contact"
+                        <button v-if="order.status === '待确认'" class="btn-contact"
                             @click="navigateToCustomerService">
                             联系客服
                         </button>
-                        <button v-if="order.status === 'completed'" class="btn-contact"
+                        <button v-if="order.status === '已完成'" class="btn-contact"
                             @click="navigateToCustomerService">
                             联系客服
                         </button>
@@ -71,8 +80,7 @@
 
             <!-- 无订单状态 -->
             <div class="no-orders" v-else>
-                <img src="../assets/empty.png" alt="暂无订单" class="empty-image">
-                <p>暂无订单记录</p>
+                <p>暂无订单</p>
                 <button class="btn-go-reserve" @click="goToReserve">立即预约</button>
             </div>
         </div>
@@ -127,6 +135,14 @@ export default {
                 // 调用订单API获取数据
                 const data = await getOrdersByUserId(currentUserId);
 
+                // 检查返回数据是否为空
+                if (!data) {
+                    orders.value = [];
+                    console.log('API返回空数据');
+                    loading.value = false;
+                    return;
+                }
+
                 // 检查是否有订单数据
                 if (data.orders && data.orders.length > 0) {
                     orders.value = data.orders;
@@ -146,21 +162,25 @@ export default {
 
         /**
          * 处理取消订单
-         * @param {string} orderId - 订单ID
+         * @param {string} orderId - 订单ID (格式如ORD000001)
          */
         const handleCancelOrder = async (orderId) => {
             if (confirm('确定要取消该订单吗？')) {
                 try {
-                    // 提取纯数字ID（去掉前缀）
-                    const numericId = orderId.replace(/[^0-9]/g, '');
-
+                    // 从格式化的订单ID中提取数字ID (从ORD000001中提取1)
+                    const numericId = parseInt(orderId.replace('ORD', ''));
+                    
+                    // 验证提取的数字ID是否有效
+                    if (isNaN(numericId) || numericId <= 0) {
+                        throw new Error('订单ID无效');
+                    }
+                    
                     // 调用取消订单API
                     await cancelOrder(numericId);
 
-                    // 更新本地订单状态
                     const order = orders.value.find(o => o.id === orderId);
                     if (order) {
-                        order.status = 'cancelled';
+                        order.status = '已取消';
                     }
 
                     alert('订单已取消');
@@ -170,7 +190,7 @@ export default {
                     // 即使API调用失败，也尝试在本地更新订单状态
                     const order = orders.value.find(o => o.id === orderId);
                     if (order) {
-                        order.status = 'cancelled';
+                        order.status = '已取消';
                     }
 
                     alert('取消订单时发生错误，请稍后重试');
@@ -192,20 +212,19 @@ export default {
         };
         /**
          * 检查订单时间并自动更新状态
-         * 当订单的结束时间已过且状态为待确认/已确认时，自动更新为已完成
+         * 当订单的结束时间已过且状态为待确认时，自动更新为已完成
          */
         const checkAndUpdateOrderStatus = () => {
             const now = new Date();
             
             orders.value.forEach(order => {
                 // 检查订单是否应该自动完成
-                if ((order.status === 'pending' || order.status === 'confirmed') && 
-                    order.reserveEndDate) {
+                if ((order.status === '待确认') && order.reserveEndDate) {
                     const endDate = new Date(order.reserveEndDate);
                     
                     // 如果当前时间已超过订单结束时间，更新状态为已完成
                     if (now > endDate) {
-                        order.status = 'completed';
+                        order.status = '已完成';
                         console.log(`订单 ${order.id} 已自动更新为已完成状态`);
                     }
                 }
@@ -270,4 +289,44 @@ export default {
 
 <style scoped>
 @import './styles/OrderStyles.css';
+
+/* 特殊要求样式 */
+.special-requests {
+    margin-top: 15px;
+    padding: 12px;
+    background-color: #f9f9f9;
+    border-radius: 6px;
+    border-left: 3px solid #4CAF50;
+}
+
+.request-label {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.request-content {
+    color: #666;
+    line-height: 1.5;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* 价格信息样式 */
+.price-info {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.price-label {
+    color: #666;
+    margin-right: 8px;
+}
+
+.price-value {
+    color: #ff6b6b;
+    font-size: 16px;
+}
 </style>

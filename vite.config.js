@@ -9,8 +9,7 @@ export default defineConfig({
       // 将所有以/api开头的请求转发到后端服务器
       '/api': {
         target: 'http://localhost:3000', // 后端服务器地址
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        changeOrigin: true
       }
     }
   }

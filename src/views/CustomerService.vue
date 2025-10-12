@@ -145,10 +145,10 @@ export default {
           
           // 如果用户已登录，发送用户信息到服务器
           if (userInfo.value) {
-            // 确保字段名称正确，这里使用id而不是userId
+            // 统一使用user_id字段，与后端数据库保持一致
             socket.value.emit('userLogin', {
               username: userInfo.value.username,
-              userId: userInfo.value.id || userInfo.value.userId
+              userId: userInfo.value.user_id
             });
             console.log('用户登录信息已发送到服务器:', userInfo.value);
           } else {

@@ -9,6 +9,7 @@ import Order from '../views/Order.vue'
 import CustomerService from '../views/CustomerService.vue'
 import ReserveSuccess from '../views/ReserveSuccess.vue'
 import Adoption from '../views/Adoption.vue'
+import Pets from '../views/Pets.vue'
 
 const routes = [
     {
@@ -61,6 +62,11 @@ const routes = [
         name:'Adoption',
         component:Adoption
     },
+    {
+        path:'/pets',
+        name:'Pets',
+        component:Pets
+    },
     
 ]
 const router = createRouter({
@@ -73,7 +79,7 @@ const router = createRouter({
  */
 router.beforeEach((to, from, next) => {
     // 需要登录的路由列表
-    const requiresAuth = ['Profile', 'Reserve', 'Order', 'CustomerService', 'ReserveSuccess']
+    const requiresAuth = ['Profile', 'Reserve', 'Order', 'CustomerService', 'ReserveSuccess', 'Pets']
     
     // 检查是否需要登录以及用户是否已登录
     const isAuthenticated = !!sessionStorage.getItem('userInfo')

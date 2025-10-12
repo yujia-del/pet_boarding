@@ -5,7 +5,7 @@ const dbConfig = {
   host: 'localhost',
   user: 'root', // 请替换为您的MySQL用户名
   password: 'yujiatong2279', // 请替换为您的MySQL密码
-  database: 'pet_reserve',
+  database: 'pet_boarding',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -55,35 +55,70 @@ async function createTables() {
   try {
     const connection = await pool.getConnection();
     
-    // 创建users表
+    // 创建user表（用户表）
     await connection.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+      CREATE TABLE IF NOT EXISTS user (
+        user_id INT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(50) NOT NULL UNIQUE,
-        email VARCHAR(100) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
-        address VARCHAR(255),
         phone VARCHAR(20),
+        email VARCHAR(100) NOT NULL UNIQUE,
+        address VARCHAR(255),
+        avatar VARCHAR(255) DEFAULT 'user.svg',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+    console.log('user表已创建或已存在');
+    
+    // 创建pet表（宠物表）
     await connection.query(`
-      CREATE TABLE IF NOT EXISTS orders (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        pet_name VARCHAR(50),
-        pet_type VARCHAR(50),
-        start_date DATETIME,
-        end_date DATETIME,
-        total_price DECIMAL(10,2),
-        status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+      CREATE TABLE IF NOT EXISTS pet (
+        pet_id INT AUTO_INCREMENT PRIMARY KEY,
+        pet_name VARCHAR(50) NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        breed VARCHAR(50),
+        age INT,
+        weight DECIMAL(5,2),
+        health_info TEXT,
+        owner_id INT NOT NULL,
+        gender VARCHAR(10),
+        FOREIGN KEY (owner_id) REFERENCES user(user_id)
       )
     `);
-    console.log('orders表已创建或已存在');
+    console.log('pet表已创建或已存在');
+    
+    // 创建host_availability表（寄养方可用时间表）
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS host_availability (
+        availability_id INT AUTO_INCREMENT PRIMARY KEY,
+        host_user_id INT NOT NULL,
+        date DATE NOT NULL,
+        max_pets INT NOT NULL DEFAULT 0,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (host_user_id) REFERENCES user(user_id)
+      )
+    `);
+    console.log('host_availability表已创建或已存在');
+    
+    // 创建order表（订单表）
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS \`order\` (
+        order_id INT AUTO_INCREMENT PRIMARY KEY,
+        pet_id INT NOT NULL,
+        host_user_id INT NOT NULL,
+        start_date DATETIME NOT NULL,
+        end_date DATETIME NOT NULL,
+        status VARCHAR(20) DEFAULT '待确认',
+        special_requests TEXT,
+        total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (pet_id) REFERENCES pet(pet_id),
+        FOREIGN KEY (host_user_id) REFERENCES user(user_id)
+      )
+    `);
+    console.log('order表已创建或已存在');
     
     connection.release();
   } catch (error) {

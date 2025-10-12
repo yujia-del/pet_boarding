@@ -39,9 +39,9 @@ export const formatDateTime = (date) => {
 };
 
 /**
- * 格式化日期时间（精确到分钟）
+ * 格式化日期时间（精确到小时）
  * @param {string|Date|number} date - 日期字符串、Date对象或时间戳
- * @returns {string} 格式化后的日期时间字符串 (YYYY-MM-DD HH:mm)
+ * @returns {string} 格式化后的日期时间字符串 (YYYY-MM-DD HH:00)
  */
 export const formatDateWithTime = (date) => {
   if (!date) return '';
@@ -79,9 +79,8 @@ export const formatDateWithTime = (date) => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
   
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
+  return `${year}-${month}-${day} ${hours}:00`;
 };
 
 /**
@@ -90,11 +89,17 @@ export const formatDateWithTime = (date) => {
  * @returns {string} 状态对应的中文文本
  */
 export const getOrderStatusText = (status) => {
+  // 检查是否已经是中文状态值
+  const chineseStatuses = ['待确认', '已确认', '已完成', '已取消', '失败'];
+  if (chineseStatuses.includes(status)) {
+    return status;
+  }
+  
   const statusMap = {
     pending: '待确认',
     confirmed: '已确认',
     completed: '已完成',
-    cancelled: '已取消', // 添加对cancelled（两个'l'）的支持
+    cancelled: '已取消',
     failed: '失败'
   };
   
@@ -107,15 +112,21 @@ export const getOrderStatusText = (status) => {
  * @returns {string} 对应的CSS类名
  */
 export const getOrderStatusClass = (status) => {
-  const statusClassMap = {
+  const statusMap = {
+    '待确认': 'status-pending',
+    '已确认': 'status-confirmed',
+    '已完成': 'status-completed',
+    '已取消': 'status-cancelled',
+    '失败': 'status-failed',
+    // 同时支持英文状态值
     pending: 'status-pending',
     confirmed: 'status-confirmed',
     completed: 'status-completed',
-    cancelled: 'status-cancelled', // 添加对cancelled（两个'l'）的支持
+    cancelled: 'status-cancelled',
     failed: 'status-failed'
   };
   
-  return statusClassMap[status] || '';
+  return statusMap[status] || '';
 };
 
 /**
@@ -161,5 +172,6 @@ export const formatPetType = (petType) => {
     other: '其他'
   };
   
-  return petTypeMap[petType.toLowerCase()] || petType;
+  // 检查petType是否存在，避免TypeError
+  return petType ? (petTypeMap[petType.toLowerCase()] || petType) : '未知';
 };

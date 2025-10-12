@@ -5,6 +5,7 @@ import bodyParser from 'body-parser';
 import { initializeDatabase } from './server/db.js';
 import userRoutes from './server/routes/users.js';
 import orderRoutes from './server/routes/orders.js';
+import petRoutes from './server/routes/pets.js';
 import { Server } from 'socket.io';
 import http from 'http';
 
@@ -27,6 +28,7 @@ app.use(bodyParser.json());
 // 路由
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/pets', petRoutes);
 
 // 测试接口
 app.get('/api', (req, res) => {

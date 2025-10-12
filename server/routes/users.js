@@ -39,7 +39,7 @@ router.post('/register', async (req, res) => {
     
     // 检查用户是否已存在
     const [existingUsers] = await pool.query(
-      'SELECT * FROM users WHERE username = ? OR email = ?',
+      'SELECT * FROM user WHERE username = ? OR email = ?',
       [username, email]
     );
     
@@ -52,7 +52,7 @@ router.post('/register', async (req, res) => {
     
     // 创建新用户，包含地址和电话字段
     const [result] = await pool.query(
-      'INSERT INTO users (username, email, address, phone, password) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO user (username, email, address, phone, password) VALUES (?, ?, ?, ?, ?)',
       [username, email, address, phone, hashedPassword]
     );
     
@@ -73,7 +73,7 @@ router.post('/login', async (req, res) => {
     
     // 查找用户（支持用户名或邮箱登录）
     const [users] = await pool.query(
-      'SELECT * FROM users WHERE username = ? OR email = ?',
+      'SELECT * FROM user WHERE username = ? OR email = ?',
       [username, username]
     );
     
@@ -109,7 +109,7 @@ router.get('/:id', async (req, res) => {
     
     // 根据ID查找用户
     const [users] = await pool.query(
-      'SELECT * FROM users WHERE id = ?',
+      'SELECT * FROM user WHERE user_id = ?',
       [id]
     );
     
@@ -126,10 +126,10 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 更新用户信息
+// 更新用户信息（包含头像字段）
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { address, phone } = req.body;
+  const { address, phone, avatar } = req.body;
   
   try {
     // 获取数据库连接池
@@ -137,7 +137,7 @@ router.put('/:id', async (req, res) => {
     
     // 检查用户是否存在
     const [users] = await pool.query(
-      'SELECT * FROM users WHERE id = ?',
+      'SELECT * FROM user WHERE user_id = ?',
       [id]
     );
     
@@ -145,16 +145,51 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ message: '用户不存在' });
     }
     
-    // 更新用户信息，特别是地址和电话字段
+    // 更新用户信息，包含头像字段
     await pool.query(
-      'UPDATE users SET address = ?, phone = ? WHERE id = ?',
-      [address, phone, id]
+      'UPDATE user SET address = ?, phone = ?, avatar = ? WHERE user_id = ?',
+      [address, phone, avatar, id]
     );
     
     res.json({ message: '用户信息更新成功' });
   } catch (error) {
     console.error('更新用户信息失败：', error);
     res.status(500).json({ message: '更新用户信息失败，请稍后再试' });
+  }
+});
+
+// 头像上传处理
+router.post('/:id/upload-avatar', async (req, res) => {
+  try {
+    // 注意：在实际生产环境中，应该使用multer等中间件处理文件上传
+    // 这里为了简化示例，假设客户端直接发送了图片的Base64编码或URL
+    const { id } = req.params;
+    const { avatarData } = req.body;
+    
+    // 获取数据库连接池
+    const pool = await getPool();
+    
+    // 检查用户是否存在
+    const [users] = await pool.query(
+      'SELECT * FROM user WHERE user_id = ?',
+      [id]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+    
+    // 保存头像信息到数据库
+    // 实际应用中，这里应该处理文件存储逻辑
+    await pool.query(
+      'UPDATE user SET avatar = ? WHERE user_id = ?',
+      [avatarData, id]
+    );
+    
+    res.json({ message: '头像上传成功' });
+  } catch (error) {
+    console.error('头像上传失败：', error);
+    res.status(500).json({ message: '头像上传失败，请稍后再试' });
   }
 });
 

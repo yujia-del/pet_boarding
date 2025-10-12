@@ -37,7 +37,8 @@ export const isUserLoggedIn = () => {
  */
 export const getCurrentUserId = () => {
   const userInfo = getUserInfo();
-  return userInfo ? userInfo.id : null;
+  // 统一使用user_id字段，与后端数据库保持一致
+  return userInfo ? userInfo.user_id : null;
 };
 
 /**
