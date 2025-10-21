@@ -39,9 +39,9 @@ export const formatDateTime = (date) => {
 };
 
 /**
- * 格式化日期时间（精确到小时）
+ * 格式化日期时间（精确到分钟）
  * @param {string|Date|number} date - 日期字符串、Date对象或时间戳
- * @returns {string} 格式化后的日期时间字符串 (YYYY-MM-DD HH:00)
+ * @returns {string} 格式化后的日期时间字符串 (YYYY-MM-DD HH:mm)
  */
 export const formatDateWithTime = (date) => {
   if (!date) return '';
@@ -79,8 +79,9 @@ export const formatDateWithTime = (date) => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
   
-  return `${year}-${month}-${day} ${hours}:00`;
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 };
 
 /**
@@ -90,7 +91,7 @@ export const formatDateWithTime = (date) => {
  */
 export const getOrderStatusText = (status) => {
   // 检查是否已经是中文状态值
-  const chineseStatuses = ['待确认', '已确认', '已完成', '已取消', '失败'];
+  const chineseStatuses = ['待确认', '已确认', '进行中', '已完成', '已取消', '失败', '待进行'];
   if (chineseStatuses.includes(status)) {
     return status;
   }
@@ -98,9 +99,11 @@ export const getOrderStatusText = (status) => {
   const statusMap = {
     pending: '待确认',
     confirmed: '已确认',
+    inProgress: '进行中',
     completed: '已完成',
     cancelled: '已取消',
-    failed: '失败'
+    failed: '失败',
+    awaitingProgress: '待进行'
   };
   
   return statusMap[status] || status;
@@ -115,15 +118,19 @@ export const getOrderStatusClass = (status) => {
   const statusMap = {
     '待确认': 'status-pending',
     '已确认': 'status-confirmed',
+    '进行中': 'status-in-progress',
     '已完成': 'status-completed',
     '已取消': 'status-cancelled',
     '失败': 'status-failed',
+    '待进行': 'status-awaiting-progress',
     // 同时支持英文状态值
     pending: 'status-pending',
     confirmed: 'status-confirmed',
+    inProgress: 'status-in-progress',
     completed: 'status-completed',
     cancelled: 'status-cancelled',
-    failed: 'status-failed'
+    failed: 'status-failed',
+    awaitingProgress: 'status-awaiting-progress'
   };
   
   return statusMap[status] || '';

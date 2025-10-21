@@ -145,12 +145,233 @@ function startServer() {
   initializeDatabase()
     .then(() => {
       console.log('数据库初始化完成！API现在可以正常使用');
+      
+      // 初始化完成后启动定时任务
+      startScheduledTasks();
     })
     .catch(error => {
       console.error('数据库初始化失败:', error);
       // 可以选择是否退出，取决于数据库对应用的重要性
       // process.exit(1);
     });
+}
+
+/**
+ * 启动所有定时任务
+ */
+function startScheduledTasks() {
+  console.log('启动定时任务...');
+  
+  // 定时检查并取消超过一小时未确认的订单，每5分钟执行一次
+  const orderCheckInterval = setInterval(async () => {
+    try {
+      await cancelUnconfirmedOrders();
+    } catch (error) {
+      console.error('定时任务执行失败:', error);
+    }
+  }, 5 * 60 * 1000); // 5分钟
+  
+  console.log('订单自动取消任务已启动，每5分钟检查一次');
+  
+  // 定时检查并将超过开始时间的待进行订单状态更新为进行中，每5分钟执行一次
+  const inProgressOrdersInterval = setInterval(async () => {
+    try {
+      await updateInProgressOrders();
+    } catch (error) {
+      console.error('更新进行中订单状态任务执行失败:', error);
+    }
+  }, 0.5 * 60 * 1000); // 5分钟
+  
+  console.log('订单自动变为进行中任务已启动，每5分钟检查一次');
+  
+  // 定时检查并将超过结束时间的订单状态更新为已完成，每5分钟执行一次
+  const completeOrdersInterval = setInterval(async () => {
+    try {
+      await updateCompletedOrders();
+    } catch (error) {
+      console.error('更新已完成订单状态任务执行失败:', error);
+    }
+  }, 0.5 * 60 * 1000); // 5分钟
+  
+  console.log('订单自动完成任务已启动，每5分钟检查一次');
+}
+
+/**
+ * 取消超过一小时未确认的待确认状态订单，并释放对应的名额
+ */
+async function cancelUnconfirmedOrders() {
+  try {
+    // 等待数据库连接就绪
+    const pool = await import('./server/db.js').then(m => m.getPool());
+    
+    // 先查询需要取消的订单
+    const [ordersToCancel] = await pool.query(
+      'SELECT order_id, start_date, end_date FROM \`order\` WHERE status = ? AND create_time < DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+      ['待确认']
+    );
+    
+    if (ordersToCancel.length === 0) {
+      console.log('没有需要自动取消的订单');
+      return;
+    }
+    
+    // 开始事务
+    await pool.query('START TRANSACTION');
+    
+    try {
+      // 更新订单状态为已取消
+      const [result] = await pool.query(
+        'UPDATE \`order\` SET status = ? WHERE status = ? AND create_time < DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+        ['已取消', '待确认']
+      );
+      
+      // 为每个取消的订单释放名额
+      for (const order of ordersToCancel) {
+        const start = new Date(order.start_date);
+        const end = new Date(order.end_date);
+        const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+        
+        // 遍历日期范围，减少每天的已预约宠物数量
+        for (let i = 0; i <= daysDiff; i++) {
+          const updateDate = new Date(start);
+          updateDate.setDate(start.getDate() + i);
+          const updateDateStr = updateDate.toISOString().split('T')[0];
+          
+          // 减少名额，确保不小于0
+          await pool.query(
+            'UPDATE host_availability SET booked_pets = GREATEST(0, booked_pets - 1) WHERE date = ?',
+            [updateDateStr]
+          );
+          
+          console.log(`订单自动取消：已更新日期 ${updateDateStr} 的预约人数，减少1人`);
+        }
+      }
+      
+      // 提交事务
+      await pool.query('COMMIT');
+      
+      if (result.affectedRows > 0) {
+        console.log(`已自动取消 ${result.affectedRows} 个超过一小时未确认的订单，并释放了相应名额`);
+      }
+    } catch (error) {
+      // 出错时回滚事务
+      await pool.query('ROLLBACK');
+      console.error('处理订单取消时发生错误，已回滚事务:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('取消未确认订单失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 将超过开始时间的待进行订单状态更新为进行中
+ * 查找所有开始日期小于当前日期且状态为"待进行"的订单，并将状态更新为"进行中"
+ */
+async function updateInProgressOrders() {
+  try {
+    // 等待数据库连接就绪
+    const pool = await import('./server/db.js').then(m => m.getPool());
+    
+    // 开始事务
+    await pool.query('START TRANSACTION');
+    
+    try {
+      // 更新订单状态为进行中
+      const [result] = await pool.query(
+        'UPDATE \`order\` SET status = ? WHERE status = ? AND start_date <= NOW()',
+        ['进行中', '待进行']
+      );
+      
+      // 提交事务
+      await pool.query('COMMIT');
+      
+      if (result.affectedRows > 0) {
+        console.log(`已自动将 ${result.affectedRows} 个开始时间已到的待进行订单状态更新为进行中`);
+      } else {
+        console.log('没有需要自动变为进行中的订单');
+      }
+    } catch (error) {
+      // 出错时回滚事务
+      await pool.query('ROLLBACK');
+      console.error('处理订单自动变为进行中时发生错误，已回滚事务:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('更新进行中订单状态失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 将超过结束时间的订单状态更新为已完成，并释放对应的名额
+ * 查找所有结束日期小于当前日期且状态不是"已完成"或"已取消"的订单，并将状态更新为"已完成"
+ */
+async function updateCompletedOrders() {
+  try {
+    // 等待数据库连接就绪
+    const pool = await import('./server/db.js').then(m => m.getPool());
+    
+    // 先查询需要更新为已完成的订单
+    const [ordersToComplete] = await pool.query(
+      'SELECT order_id, start_date, end_date FROM \`order\` WHERE status NOT IN (?, ?) AND end_date < NOW()',
+      ['已完成', '已取消']
+    );
+    
+    if (ordersToComplete.length === 0) {
+      console.log('没有需要自动完成的订单');
+      return;
+    }
+    
+    // 开始事务
+    await pool.query('START TRANSACTION');
+    
+    try {
+      // 更新订单状态为已完成
+      const [result] = await pool.query(
+        'UPDATE \`order\` SET status = ? WHERE status NOT IN (?, ?) AND end_date < NOW()',
+        ['已完成', '已完成', '已取消']
+      );
+      
+      // 为每个完成的订单释放名额
+      for (const order of ordersToComplete) {
+        const start = new Date(order.start_date);
+        const end = new Date(order.end_date);
+        const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+        
+        // 遍历日期范围，减少每天的已预约宠物数量
+        for (let i = 0; i <= daysDiff; i++) {
+          const updateDate = new Date(start);
+          updateDate.setDate(start.getDate() + i);
+          const updateDateStr = updateDate.toISOString().split('T')[0];
+          
+          // 减少名额，确保不小于0
+          await pool.query(
+            'UPDATE host_availability SET booked_pets = GREATEST(0, booked_pets - 1) WHERE date = ?',
+            [updateDateStr]
+          );
+          
+          console.log(`订单自动完成：已更新日期 ${updateDateStr} 的预约人数，减少1人`);
+        }
+      }
+      
+      // 提交事务
+      await pool.query('COMMIT');
+      
+      if (result.affectedRows > 0) {
+        console.log(`已自动将 ${result.affectedRows} 个超过结束时间的订单状态更新为已完成，并释放了相应名额`);
+      }
+    } catch (error) {
+      // 出错时回滚事务
+      await pool.query('ROLLBACK');
+      console.error('处理订单自动完成时发生错误，已回滚事务:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('更新已完成订单状态失败:', error);
+    throw error;
+  }
 }
 
 // 启动服务器

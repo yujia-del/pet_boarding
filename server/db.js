@@ -88,16 +88,13 @@ async function createTables() {
     `);
     console.log('pet表已创建或已存在');
     
-    // 创建host_availability表（寄养方可用时间表）
+    // 创建host_availability表（全局日期可用名额表）
     await connection.query(`
       CREATE TABLE IF NOT EXISTS host_availability (
-        availability_id INT AUTO_INCREMENT PRIMARY KEY,
-        host_user_id INT NOT NULL,
         date DATE NOT NULL,
-        max_pets INT NOT NULL DEFAULT 0,
-        description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (host_user_id) REFERENCES user(user_id)
+        max_pets INT NOT NULL DEFAULT 5, -- 每天固定5个名额
+        booked_pets INT NOT NULL DEFAULT 0,
+        PRIMARY KEY (date)
       )
     `);
     console.log('host_availability表已创建或已存在');

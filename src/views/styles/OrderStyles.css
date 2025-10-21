@@ -15,7 +15,6 @@
   text-align: center;
   padding: 4rem 2rem;
   background-color: white;
-  border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -24,14 +23,18 @@
   height: 50px;
   border: 3px solid #f3f3f3;
   border-top: 3px solid rgb(255, 126, 147);
-  border-radius: 50%;
   margin: 0 auto 1rem;
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-state p {
@@ -44,7 +47,6 @@
   text-align: center;
   padding: 4rem 2rem;
   background-color: white;
-  border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -59,7 +61,6 @@
   background-color: rgb(255, 126, 147);
   color: white;
   border: none;
-  border-radius: 6px;
   font-size: 1rem;
   cursor: pointer;
   transition: background-color 0.3s ease;
@@ -92,17 +93,11 @@
 }
 
 .order-item {
-  background-color: white;
-  border-radius: 12px;
+  background-color: rgb(241, 241, 241);
   padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.order-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-}
 
 .order-header {
   display: flex;
@@ -131,29 +126,17 @@
 
 .order-status {
   padding: 0.5rem 1rem;
-  border-radius: 20px;
   font-size: 0.9rem;
   font-weight: 500;
 }
 
-.status-pending {
-  background-color: #fff3cd;
-  color: #856404;
-}
-
-.status-confirmed {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.status-completed {
-  background-color: #d1ecf1;
-  color: #0c5460;
-}
-
-.status-cancelled {
-  background-color: #fedbdb;
-  color: #0c5460;
+.status-in-progress,
+.status-pending,
+.status-confirmed,
+.status-completed,
+.status-cancelled,
+.status-awaiting-progress {
+  color: #000000;
 }
 
 .order-details {
@@ -226,32 +209,39 @@
 
 .btn-cancel,
 .btn-contact,
-.btn-review {
+.btn-review,
+.btn-confirm {
   padding: 0.6rem 1.5rem;
-  border: none;
-  border-radius: 6px;
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.3s ease;
   font-weight: 500;
 }
+.btn-confirm {
+  background-color: #ff739b;
+  color: white;
+}
+
+.btn-confirm:hover {
+  background-color: #ff5f8d;
+}
 
 .btn-cancel {
-  background-color: #ff6b81;
+  background-color: #8d8888;
   color: white;
 }
 
 .btn-cancel:hover {
-  background-color: #ff4757;
+  background-color: #5e5e5e;
 }
 
 .btn-contact {
-  background-color: #74b9ff;
+  background-color: #8d8888;
   color: white;
 }
 
 .btn-contact:hover {
-  background-color: #0984e3;
+  background-color: #5e5e5e;
 }
 
 .btn-review {
@@ -267,7 +257,6 @@
   text-align: center;
   padding: 4rem 2rem;
   background-color: white;
-  border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -289,11 +278,11 @@
   background-color: rgb(255, 126, 147);
   color: white;
   border: none;
-  border-radius: 6px;
   font-size: 1rem;
   cursor: pointer;
   transition: background-color 0.3s ease;
   font-weight: 500;
+  border-radius: 5px;
 }
 
 .btn-go-reserve:hover {
@@ -301,57 +290,55 @@
 }
 
 .reserve-table button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.3s ease;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
 }
 
 .reserve-table button:hover {
-    background-color: #45a049;
+  background-color: #45a049;
 }
 
 .reserve-table button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 
 .time-slot-info {
-    margin-top: 10px;
-    font-size: 14px;
-    color: #666;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #666;
 }
 
 .quota-count {
-    color: #4CAF50;
-    font-weight: bold;
-    font-size: 16px;
+  color: #4CAF50;
+  font-weight: bold;
+  font-size: 16px;
 }
 
 @media (max-width: 768px) {
   .order-content {
     padding: 1rem;
   }
-  
+
   .order-details {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .reserve-info {
     text-align: left;
     width: 100%;
   }
-  
+
   .date-info {
     justify-content: flex-start;
   }
-  
+
   .order-actions {
     justify-content: center;
     width: 100%;

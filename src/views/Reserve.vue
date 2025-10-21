@@ -69,18 +69,8 @@
                             </div>
                         </div>
                         <div v-if="timeSlotInfo" class="time-slot-info">
-                            剩余名额: <span class="quota-count">{{ timeSlotInfo.available }}</span>/{{ timeSlotInfo.total }}
-                            <span v-if="timeSlotInfo.available <= 0" class="no-quota-warning">（已满）</span>
-                        </div>
-                        
-                        <!-- 显示各时间段预约人数统计 -->
-                        <div v-if="timeSlotInfo && timeSlotInfo.bookedByTimeSlot" class="time-slot-stats">
-                            <div class="stats-title">各时间段预约情况:</div>
-                            <div class="time-slot-list">
-                                <div v-for="slot in timeSlotsList" :key="slot.time" class="time-slot-item">
-                                    <span class="slot-time">{{ formatTimeDisplay(slot.time) }}</span>
-                                    <span class="slot-status" :class="{ 'slot-full': slot.booked >= timeSlotInfo.total }">{{ slot.booked }}/{{ timeSlotInfo.total }}</span>
-                                </div>
+                            <div class="date-range-info">
+                                剩余名额: <span >{{ timeSlotInfo.available }}</span>/{{ timeSlotInfo.total }}
                             </div>
                         </div>
                     </div>
@@ -536,9 +526,66 @@ export default {
          * 日期改变时的处理函数
          */
         async function onDateChange() {
-            // 如果选择了日期和时间，检查时间段名额
-            if (formData.reserveStartDate && formData.reserveStartTime) {
-                await checkTimeSlotQuota();
+            // 如果选择了日期范围，检查日期范围内的最低剩余名额
+            if (formData.reserveStartDate && formData.reserveEndDate) {
+                await checkDateRangeQuota();
+            }
+        }
+        
+        /**
+         * 检查日期范围内的最低剩余名额
+         */
+        async function checkDateRangeQuota() {
+            try {
+                const { reserveStartDate, reserveEndDate } = formData;
+                
+                // 确保日期格式正确
+                const formattedStartDate = reserveStartDate.replace(/[^0-9-]/g, '');
+                const formattedEndDate = reserveEndDate.replace(/[^0-9-]/g, '');
+                
+                // 构建API URL，包含开始日期和结束日期
+                let apiUrl = `http://localhost:3000/api/orders/check-availability/${formattedStartDate}`;
+                if (formattedEndDate && formattedStartDate !== formattedEndDate) {
+                    apiUrl += `?endDate=${formattedEndDate}`;
+                }
+                
+                // 调用后端API检查日期范围的可用名额
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('检查可用名额失败');
+                }
+                
+                const data = await response.json();
+                
+                // 更新时间段信息，显示日期范围内最低的剩余名额
+                // 修复：使用正确的字段名minAvailable替代available
+                const bookedCount = data.maxPets - data.minAvailable;
+                
+                timeSlotInfo.value = {
+                    total: data.maxPets,
+                    available: data.minAvailable !== undefined ? data.minAvailable : 0,
+                    booked: bookedCount,
+                    description: data.description || '',
+                    bookedByTimeSlot: data.bookedByTimeSlot || {},
+                    dailyAvailability: data.dailyAvailability  // 保存详细的每日可用信息
+                };
+                
+                console.log('日期范围名额信息:', data);
+            } catch (error) {
+                console.error('检查日期范围名额失败:', error);
+                // 错误时默认显示一些名额，避免界面卡住
+                timeSlotInfo.value = {
+                    total: 5,
+                    available: 0,
+                    booked: 5,
+                    description: '系统暂时无法查询名额信息，请稍后再试'
+                };
             }
         }
         
@@ -602,14 +649,23 @@ export default {
                 dateAvailabilityCache.value[formData.reserveStartDate] = data.hasAvailability;
                 
                 // 设置时间段信息，包含按时间段统计的预约情况
+                // 修复：统一使用正确的字段名映射
+                const currentDateAvailability = data.dailyAvailability ? data.dailyAvailability[formData.reserveStartDate] : null;
+                // 优先使用minAvailable字段，这是后端返回的标准字段名
+                const availableCount = data.minAvailable !== undefined ? data.minAvailable : 0;
+                // 计算已预约数量：总名额减去可用名额
+                const bookedCount = data.maxPets - availableCount;
+                
                 timeSlotInfo.value = {
                     date: formData.reserveStartDate,
                     time: selectedTimeSlot || '全天',
                     total: data.maxPets,
-                    booked: data.booked,
-                    available: data.available,
+                    booked: bookedCount,
+                    available: availableCount,
                     timeSlot: data.timeSlot,  // 存储当前查询的具体时间段
-                    bookedByTimeSlot: data.bookedByTimeSlot  // 存储各时间段的预约人数统计
+                    bookedByTimeSlot: data.bookedByTimeSlot || {},  // 存储各时间段的预约人数统计
+                    description: data.description || '',  // 存储日期描述信息
+                    dailyAvailability: data.dailyAvailability  // 保存详细的每日可用信息
                 };
             } catch (error) {
                 console.error('检查时间段名额失败:', error);
@@ -663,6 +719,30 @@ export default {
             const startDateTime = `${formData.reserveStartDate}T${formData.reserveStartTime}:00`;
             const endDateTime = `${formData.reserveEndDate}T${formData.reserveEndTime}:00`;
             
+            // 验证：订单起始时间必须大于24小时（使用完整日期时间计算）
+            const startDate = new Date(startDateTime);
+            const endDate = new Date(endDateTime);
+            
+            // 日期时间逻辑验证：结束时间不能早于开始时间
+            if (endDate < startDate) {
+                alert('结束时间不能早于开始时间')
+                return
+            }
+            
+            // 额外验证：结束时间不能等于开始时间
+            if (endDate.getTime() === startDate.getTime()) {
+                alert('结束时间不能等于开始时间')
+                return
+            }
+            
+            const diffTime = Math.abs(endDate - startDate);
+            const diffHours = diffTime / (1000 * 60 * 60);
+            
+            if (diffHours <= 24) {
+                alert('订单时间必须大于24小时')
+                return
+            }
+            
             // 验证：预约开始时间不能早于当前时间
             const currentDateTime = new Date();
             if (new Date(startDateTime) < currentDateTime) {
@@ -673,11 +753,17 @@ export default {
             // 提交前再次检查可用名额，防止并发预约导致的名额问题
             try {
                 // 确保日期格式正确
-                const formattedDate = formData.reserveStartDate.replace(/[^0-9-]/g, '');
-                console.log(`格式化后的日期: ${formattedDate}`);
+                const formattedStartDate = formData.reserveStartDate.replace(/[^0-9-]/g, '');
+                const formattedEndDate = formData.reserveEndDate.replace(/[^0-9-]/g, '');
                 
-                // 构建API URL
-                const apiUrl = `http://localhost:3000/api/orders/check-availability/${formattedDate}`;
+                console.log(`检查日期范围 ${formattedStartDate} 至 ${formattedEndDate} 的可用名额`);
+                
+                // 构建API URL，包含开始日期和结束日期
+                let apiUrl = `http://localhost:3000/api/orders/check-availability/${formattedStartDate}`;
+                if (formattedStartDate !== formattedEndDate) {
+                    apiUrl += `?endDate=${formattedEndDate}`;
+                }
+                
                 console.log(`请求API URL: ${apiUrl}`);
                 
                 const response = await fetch(apiUrl, {
@@ -710,8 +796,9 @@ export default {
                 
                 const data = await response.json();
                 
+                // 检查日期范围内的最低剩余名额
                 if (data.available <= 0) {
-                    alert(`很抱歉，${formData.reserveStartDate} 的名额已经被预约满，请选择其他日期`);
+                    alert(`很抱歉，您选择的日期范围内名额已满，请选择其他日期`);
                     return;
                 }
             } catch (error) {
@@ -769,6 +856,7 @@ export default {
                     petId: selectedPet.value.pet_id,  // 添加宠物ID
                     petName: selectedPet.value.pet_name,
                     petType: selectedPet.value.type,
+                    petBreed: selectedPet.value.breed || '', // 添加宠物品种
                     startDate: startDateTime,
                     endDate: endDateTime,
                     specialRequests: formData.specialRequests || ''
@@ -911,10 +999,34 @@ export default {
     margin-top: 4px;
 }
 
+
+.booked-count {
+    color: #606266;
+    font-size: 0.9em;
+    margin-left: 5px;
+}
+
+.date-range-info {
+    color: #606266;
+    font-size: 0.95em;
+    margin-bottom: 5px;
+}
+
 .no-quota-warning {
     color: #dc3545;
     font-size: 12px;
     margin-left: 5px;
+}
+
+.availability-description {
+    color: #6c757d;
+    font-size: 14px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-left: 3px solid #17a2b8;
+    border-radius: 4px;
+    line-height: 1.4;
 }
 
 /* 时间段统计样式 */
@@ -934,34 +1046,131 @@ export default {
 }
 
 .time-slot-list {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
 }
 
 .time-slot-item {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 8px;
-    background-color: white;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
-    font-size: 12px;
+}
+
+.time-slot-item:hover:not(.slot-full) {
+    background-color: #f5f5f5;
+    border-color: #999;
+}
+
+.time-slot-item.selected {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
 }
 
 .slot-time {
+    font-weight: bold;
     color: #495057;
     margin-bottom: 4px;
 }
 
 .slot-status {
+    font-size: 0.9em;
     font-weight: 500;
     color: #28a745;
 }
 
 .slot-full {
-    color: #dc3545;
+    color: #f44336;
+    background-color: #f44336;
+    color: white;
+    cursor: not-allowed;
+}
+
+/* 名额显示相关样式 */
+.quota-count {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.quota-normal {
+    color: #4CAF50;
+}
+
+.quota-low {
+    color: #ff9800;
+}
+
+.quota-full {
+    color: #f44336;
+}
+
+.no-quota-warning {
+    color: #f44336;
+    font-weight: bold;
+}
+
+.date-range-info {
+    margin-bottom: 10px;
+    color: #606266;
+    font-size: 0.95em;
+}
+
+.availability-description {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 5px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-left: 3px solid #17a2b8;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
+/* 每日名额详情样式 */
+.daily-quota-details {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.daily-quota-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.daily-quota-item:last-child {
+    border-bottom: none;
+}
+
+.quota-date {
+    font-weight: 500;
+}
+
+.quota-status {
+    display: flex;
+    align-items: center;
+}
+
+.quota-tight {
+    display: inline-block;
+    margin-left: 5px;
+    color: #ff9800;
+    font-size: 0.8em;
+    background-color: #fff3cd;
+    padding: 2px 6px;
+    border-radius: 3px;
 }
 .form-group label {
     display: block;

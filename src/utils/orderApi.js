@@ -39,6 +39,23 @@ export const cancelOrder = async (orderId) => {
 };
 
 /**
+ * 确认订单，将订单状态从待确认转为待进行
+ * @param {string|number} orderId - 订单ID（可能是格式化后的字符串如ORD000024）
+ * @returns {Promise<Object>} 操作结果
+ */
+export const confirmOrder = async (orderId) => {
+  const numericOrderId = typeof orderId === 'string' 
+    ? parseInt(orderId.replace(/\D/g, ''), 10) 
+    : orderId;
+  
+  // 构建正确的API路径，避免多余的斜杠
+  const endpoint = `/orders/${numericOrderId}/confirm`;
+  return apiRequest(endpoint, {
+    method: 'PUT'
+  });
+};
+
+/**
  * 创建新订单
  * @param {Object} orderData - 订单数据
  * @returns {Promise<Object>} 新创建的订单信息

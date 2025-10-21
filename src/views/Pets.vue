@@ -430,6 +430,8 @@ export default {
   color: #303133;
   margin-bottom: 20px;
   text-align: center;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .action-buttons {
@@ -442,68 +444,114 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .pets-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 20px;
+  width: 100%;
+}
+
+/* 响应式布局优化 */
+@media (max-width: 768px) {
+  .pets-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pet-card {
   height: 100%;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.pet-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 .pet-card-header {
   display: flex;
   align-items: center;
   margin-bottom: 15px;
+  flex-wrap: wrap;
 }
 
 .pet-avatar {
   margin-right: 15px;
+  flex-shrink: 0;
+}
+
+.pet-avatar .el-avatar {
+  width: 60px;
+  height: 60px;
+  font-size: 24px;
 }
 
 .pet-info {
   flex: 1;
+  min-width: 0;
 }
 
 .pet-info h3 {
   margin: 0 0 5px 0;
   color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pet-info p {
   margin: 0;
   color: #606266;
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pet-actions {
   display: flex;
   gap: 10px;
+  margin-top: 10px;
+  width: 100%;
+  justify-content: flex-end;
+  color:blue;
 }
 
 .pet-details {
   margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
 }
 
 .pet-details p {
   margin: 8px 0;
   color: #606266;
   font-size: 14px;
+  line-height: 1.5;
 }
 
 .empty-state {
   grid-column: 1 / -1;
-  padding: 60px 0;
+  padding: 80px 0;
   text-align: center;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
 }
 </style>

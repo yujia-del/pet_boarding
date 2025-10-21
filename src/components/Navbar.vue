@@ -391,7 +391,6 @@ export default {
   top: 100%;
   right: 0;
   background-color: rgba(255, 255, 255, 0.95);
-  border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   width: 220px;
   margin-top: 8px;
