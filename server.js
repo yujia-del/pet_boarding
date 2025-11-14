@@ -35,6 +35,18 @@ app.get('/api', (req, res) => {
   res.json({ message: 'API服务器运行正常' });
 });
 
+// 测试订单自动完成功能的接口
+app.get('/api/test-complete-orders', async (req, res) => {
+  try {
+    console.log('收到测试订单自动完成的请求');
+    await updateCompletedOrders();
+    res.json({ message: '订单自动完成测试执行成功' });
+  } catch (error) {
+    console.error('订单自动完成测试执行失败:', error);
+    res.status(500).json({ message: '订单自动完成测试执行失败', error: error.message });
+  }
+});
+
 // 存储在线用户信息 - 使用userId作为键，确保一个用户只能有一个连接
 const onlineUsers = new Map();
 // 存储userId到socketId的映射
@@ -180,7 +192,7 @@ function startScheduledTasks() {
     } catch (error) {
       console.error('更新进行中订单状态任务执行失败:', error);
     }
-  }, 0.5 * 60 * 1000); // 5分钟
+  }, 5 * 60 * 1000); // 5分钟
   
   console.log('订单自动变为进行中任务已启动，每5分钟检查一次');
   
@@ -191,7 +203,7 @@ function startScheduledTasks() {
     } catch (error) {
       console.error('更新已完成订单状态任务执行失败:', error);
     }
-  }, 0.5 * 60 * 1000); // 5分钟
+  }, 5 * 60 * 1000); // 5分钟
   
   console.log('订单自动完成任务已启动，每5分钟检查一次');
 }
@@ -309,15 +321,22 @@ async function updateInProgressOrders() {
  * 查找所有结束日期小于当前日期且状态不是"已完成"或"已取消"的订单，并将状态更新为"已完成"
  */
 async function updateCompletedOrders() {
+  console.log('开始执行订单自动完成检查...');
   try {
     // 等待数据库连接就绪
     const pool = await import('./server/db.js').then(m => m.getPool());
     
+    // 记录当前时间用于日志
+    const checkTime = new Date().toISOString();
+    console.log(`[${checkTime}] 执行订单自动完成检查`);
+    
     // 先查询需要更新为已完成的订单
     const [ordersToComplete] = await pool.query(
-      'SELECT order_id, start_date, end_date FROM \`order\` WHERE status NOT IN (?, ?) AND end_date < NOW()',
+      'SELECT order_id, start_date, end_date, status FROM \`order\` WHERE status NOT IN (?, ?) AND end_date < NOW()',
       ['已完成', '已取消']
     );
+    
+    console.log(`[${checkTime}] 找到 ${ordersToComplete.length} 个需要自动完成的订单`);
     
     if (ordersToComplete.length === 0) {
       console.log('没有需要自动完成的订单');
@@ -340,6 +359,8 @@ async function updateCompletedOrders() {
         const end = new Date(order.end_date);
         const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
         
+        console.log(`[${checkTime}] 处理订单 ${order.order_id}：从状态 "${order.status}" 转为 "已完成"`);
+        
         // 遍历日期范围，减少每天的已预约宠物数量
         for (let i = 0; i <= daysDiff; i++) {
           const updateDate = new Date(start);
@@ -347,12 +368,16 @@ async function updateCompletedOrders() {
           const updateDateStr = updateDate.toISOString().split('T')[0];
           
           // 减少名额，确保不小于0
-          await pool.query(
+          const [updateResult] = await pool.query(
             'UPDATE host_availability SET booked_pets = GREATEST(0, booked_pets - 1) WHERE date = ?',
             [updateDateStr]
           );
           
-          console.log(`订单自动完成：已更新日期 ${updateDateStr} 的预约人数，减少1人`);
+          if (updateResult.affectedRows > 0) {
+            console.log(`[${checkTime}] 订单 ${order.order_id} 自动完成：已更新日期 ${updateDateStr} 的预约人数，减少1人`);
+          } else {
+            console.warn(`[${checkTime}] 订单 ${order.order_id} 自动完成：日期 ${updateDateStr} 的host_availability记录不存在，无法减少名额`);
+          }
         }
       }
       
@@ -360,18 +385,19 @@ async function updateCompletedOrders() {
       await pool.query('COMMIT');
       
       if (result.affectedRows > 0) {
-        console.log(`已自动将 ${result.affectedRows} 个超过结束时间的订单状态更新为已完成，并释放了相应名额`);
+        console.log(`[${checkTime}] 已成功将 ${result.affectedRows} 个超过结束时间的订单状态更新为已完成，并释放了相应名额`);
       }
     } catch (error) {
       // 出错时回滚事务
       await pool.query('ROLLBACK');
-      console.error('处理订单自动完成时发生错误，已回滚事务:', error);
-      throw error;
+      console.error(`[${checkTime}] 处理订单自动完成时发生错误，已回滚事务:`, error);
+      // 不抛出错误，避免中断定时任务
     }
   } catch (error) {
     console.error('更新已完成订单状态失败:', error);
-    throw error;
+    // 不抛出错误，避免中断定时任务
   }
+  console.log('订单自动完成检查执行完毕');
 }
 
 // 启动服务器

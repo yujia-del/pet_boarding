@@ -22,8 +22,6 @@ async function initializeHostAvailability(pool, startDate, endDate, maxPets = 5)
       'INSERT INTO host_availability (date, max_pets, booked_pets) VALUES (?, ?, 0) ON DUPLICATE KEY UPDATE date = date',
       [dateStr, maxPets]
     );
-    
-    console.log(`已确保日期 ${dateStr} 的host_availability记录存在`);
   }
 }
 
@@ -240,6 +238,104 @@ router.get('/:userId', async (req, res) => {
  */
 
 /**
+ * 取消订单
+ * @route PUT /orders/:orderId/cancel
+ * @description 将订单状态从待确认或待进行更新为已取消，并释放相应日期的可用名额
+ * @param {number} orderId - 订单ID
+ * @returns {Object} 操作结果
+ */
+router.put('/:orderId/cancel', async (req, res) => {
+  let pool;
+  try {
+    const { orderId } = req.params;
+    
+    // 验证订单ID
+    const numericOrderId = parseInt(orderId, 10);
+    if (isNaN(numericOrderId) || numericOrderId <= 0 || numericOrderId !== Number(orderId)) {
+      return res.status(400).json({ message: '订单ID无效' });
+    }
+    const validOrderId = numericOrderId;
+    
+    pool = await getPool();
+    
+    // 检查订单是否存在并获取状态和日期信息
+    const [orders] = await pool.query(
+      'SELECT order_id as id, status, start_date, end_date FROM `order` WHERE order_id = ?',
+      [validOrderId]
+    );
+    
+    if (orders.length === 0) {
+      return res.status(404).json({ message: '订单不存在' });
+    }
+    
+    const order = orders[0];
+    
+    // 检查订单状态是否可以取消（只有待确认或待进行状态的订单可以取消）
+    if (order.status !== '待确认' && order.status !== '待进行') {
+      return res.status(400).json({
+        message: `订单当前状态为"${order.status}"，只有待确认或待进行的订单可以取消`,
+        currentStatus: order.status
+      });
+    }
+    
+    // 开始事务：更新订单状态并释放名额
+    await pool.query('START TRANSACTION');
+    
+    // 更新订单状态为已取消
+    const [updateResult] = await pool.query(
+      'UPDATE `order` SET status = ? WHERE order_id = ?',
+      ['已取消', validOrderId]
+    );
+    
+    if (updateResult.affectedRows === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ message: '订单状态更新失败，订单可能已被修改' });
+    }
+    
+    // 释放名额：遍历订单日期范围，减少每天的已预约宠物数量
+    const start = new Date(order.start_date);
+    const end = new Date(order.end_date);
+    const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    
+    for (let i = 0; i <= daysDiff; i++) {
+      const updateDate = new Date(start);
+      updateDate.setDate(start.getDate() + i);
+      const updateDateStr = updateDate.toISOString().split('T')[0];
+      
+      // 减少名额，确保不小于0
+      await pool.query(
+        'UPDATE host_availability SET booked_pets = GREATEST(0, booked_pets - 1) WHERE date = ?',
+        [updateDateStr]
+      );
+      
+      console.log(`订单取消：已更新日期 ${updateDateStr} 的预约人数，减少1人（增加名额）`);
+    }
+    
+    // 提交事务
+    await pool.query('COMMIT');
+    
+    console.log(`订单 ${validOrderId} 已取消，状态更新为已取消，已释放对应日期的可用名额`);
+    
+    res.json({
+      message: '订单已成功取消',
+      orderId: validOrderId,
+      newStatus: '已取消'
+    });
+    
+  } catch (error) {
+    console.error('取消订单失败：', error);
+    // 确保错误时回滚事务
+    if (pool) {
+      await pool.query('ROLLBACK').catch(() => {});
+    }
+    res.status(500).json({
+      message: '取消订单失败，请稍后再试',
+      error: error.message
+    });
+  }
+});
+
+/**
  * 确认订单
  * @route PUT /orders/:orderId/confirm
  * @description 将订单状态从待确认更新为待进行，并减少相应日期的可用名额
@@ -325,10 +421,25 @@ router.put('/:orderId/confirm', async (req, res) => {
       return res.status(400).json({ message: '订单状态更新失败，订单可能已被修改' });
     }
     
+    // 更新日期范围内的已预约宠物数量
+    for (let i = 0; i <= daysDiff; i++) {
+      const updateDate = new Date(start);
+      updateDate.setDate(start.getDate() + i);
+      const updateDateStr = updateDate.toISOString().split('T')[0];
+      
+      // 增加已预约宠物数量
+      await pool.query(
+        'UPDATE host_availability SET booked_pets = booked_pets + 1 WHERE date = ?',
+        [updateDateStr]
+      );
+      
+      console.log(`订单确认：已更新日期 ${updateDateStr} 的预约人数，增加1人（减少名额）`);
+    }
+    
     // 提交事务
     await pool.query('COMMIT');
     
-    console.log(`订单 ${validOrderId} 已确认，状态更新为待进行，已减少对应日期的可用名额`);
+    console.log(`订单 ${validOrderId} 已确认`);
     
     res.json({
       message: '订单已成功确认',
@@ -558,18 +669,14 @@ router.post('/', async (req, res) => {
     console.log(`订单创建成功，订单ID: ${newOrderId}`);
     
     // 订单创建成功后立即减少名额
-    // 复用前面计算的daysDiff变量，避免重复声明
-    for (let i = 0; i <= daysDiff; i++) {
-      const updateDate = new Date(start);
-      updateDate.setDate(start.getDate() + i);
-      const updateDateStr = updateDate.toISOString().split('T')[0];
-      
-      await pool.query(
-        'UPDATE host_availability SET booked_pets = booked_pets + 1 WHERE date = ?',
-        [updateDateStr]
-      );
-      console.log(`已更新日期 ${updateDateStr} 的名额使用情况`);
-    }
+    // 根据业务规则：订单创建时只减少开始当天的名额
+    const startDateStr = start.toISOString().split('T')[0];
+    
+    await pool.query(
+      'UPDATE host_availability SET booked_pets = booked_pets + 1 WHERE date = ?',
+      [startDateStr]
+    );
+    console.log(`已更新开始日期 ${startDateStr} 的名额使用情况，增加1个预约`);
     
     // 查询刚创建的订单详情，包含宠物信息
     const [newOrders] = await pool.query(
@@ -884,10 +991,8 @@ router.get('/check-availability/:date', async (req, res) => {
       dailyAvailability,
       hasAvailability: minAvailable > 0,
       description: daysDiff > 0 ? `所选日期范围内最低剩余名额为${minAvailable}个` : `当日剩余名额为${minAvailable}个`
-    };
-    
+    }
     res.json(responseData);
-    console.log(`检查日期范围 ${date} 至 ${endDate || date} 的可用名额，最低剩余名额: ${minAvailable}`);
   } catch (error) {
     console.error('检查可用名额失败：', error);
     res.status(500).json({
